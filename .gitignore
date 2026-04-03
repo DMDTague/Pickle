@@ -1,0 +1,10 @@
+# Compiled Object files
+*.o
+*.exe
+*.out
+*.app
+pickle
+
+# IDE and OS files
+.vscode/
+.DS_Store
