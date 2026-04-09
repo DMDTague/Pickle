@@ -1,5 +1,6 @@
 #include "search.h"
 #include "evaluate.h"
+#include "attacks.h"
 #include "movegen.h"
 #include "bit_utils.h"
 #include "uci.h"
@@ -49,7 +50,15 @@ int score_move(Board& board, Move move, Move tt_move, int search_ply) {
     if (get_move_capture(move)) {
         int attacker = get_move_piece(move);
         int victim = get_move_captured_piece(move);
-        return mvv_lva[victim][attacker];
+        int base_score = mvv_lva[victim][attacker];
+        
+        Color them = (Color)(1 - board.get_side_to_move());
+        Square enemy_king_sq = (Square)lsb(board.get_piece_bitboard(KING) & board.get_color_bitboard(them));
+        Square target = (Square)get_move_target(move);
+        if (enemy_king_sq >= 0 && enemy_king_sq < 64 && ((1ULL << target) & king_attacks[enemy_king_sq])) {
+            base_score += 50000;
+        }
+        return base_score;
     }
     
     // Safety boundary for ply to prevent out-of-bounds on super deep lines
@@ -71,7 +80,7 @@ int score_move(Board& board, Move move, Move tt_move, int search_ply) {
 // -----------------------------------------------------------------------------
 // Quiescence Search
 // -----------------------------------------------------------------------------
-int quiescence(int alpha, int beta, Board& board) {
+int quiescence(int alpha, int beta, Board& board, int qs_ply) {
     if ((nodes_searched & 2047) == 0) {
         check_time();
     }
@@ -114,13 +123,29 @@ int quiescence(int alpha, int beta, Board& board) {
 
         Move move = move_list.moves[i];
 
-        // Process only tactical moves (captures or promotions)
-        if (!get_move_capture(move) && !get_move_promoted(move)) {
+        bool is_tactical = get_move_capture(move) || get_move_promoted(move);
+        
+        // Skip quiet moves if we have reached our Check QS limit
+        if (!is_tactical && qs_ply >= 2) {
             continue;
         }
 
         if (board.make_move(move)) {
-            int score = -quiescence(-beta, -alpha, board);
+            bool is_check = false;
+            if (!is_tactical) {
+                Color stm = board.get_side_to_move(); 
+                Square enemy_king_sq = (Square)lsb(board.get_piece_bitboard(KING) & board.get_color_bitboard(stm));
+                if (board.is_square_attacked(enemy_king_sq, (Color)(1 - stm))) {
+                    is_check = true;
+                }
+                
+                if (!is_check) {
+                    board.unmake_move(move);
+                    continue; // Skip it if it wasn't a check
+                }
+            }
+
+            int score = -quiescence(-beta, -alpha, board, qs_ply + 1);
             board.unmake_move(move);
 
             if (score >= beta) {
@@ -146,7 +171,7 @@ int negamax(int depth, int alpha, int beta, Board& board, int search_ply, bool c
     nodes_searched++;
 
     if (depth == 0) {
-        return quiescence(alpha, beta, board);
+        return quiescence(alpha, beta, board, 0);
     }
 
     // Check status
@@ -154,12 +179,21 @@ int negamax(int depth, int alpha, int beta, Board& board, int search_ply, bool c
     Color them = (Color)(1 - us);
     Bitboard our_king_bb = board.get_piece_bitboard(KING) & board.get_color_bitboard(us);
     Square our_king_sq = (Square)lsb(our_king_bb);
+    Bitboard enemy_king_bb = board.get_piece_bitboard(KING) & board.get_color_bitboard(them);
+    Square enemy_king_sq = (Square)lsb(enemy_king_bb);
     bool in_check = board.is_square_attacked(our_king_sq, them);
 
     if (in_check) depth++; // Check Extension
 
+    if (search_ply > 0 && board.is_draw()) {
+        return -CONTEMPT_FACTOR;
+    }
+
+    int static_eval = evaluate(board);
+    bool high_tension = std::abs(static_eval) > 300;
+
     // Null Move Pruning
-    if (depth >= 3 && can_null_move && !in_check && board.has_non_pawn_material(us)) {
+    if (depth >= 3 && can_null_move && !in_check && board.has_non_pawn_material(us) && !high_tension) {
         board.make_null_move();
         int null_score = -negamax(depth - 3, -beta, -beta + 1, board, search_ply + 1, false);
         board.unmake_null_move();
@@ -204,6 +238,10 @@ int negamax(int depth, int alpha, int beta, Board& board, int search_ply, bool c
         std::swap(scores[i], scores[best_index]);
 
         Move move = move_list.moves[i];
+        Square target = (Square)get_move_target(move);
+        bool attacks_king_zone = (enemy_king_sq >= 0 && enemy_king_sq < 64) && ((1ULL << target) & king_attacks[enemy_king_sq]);
+        
+        int extension = attacks_king_zone ? 1 : 0;
 
         if (board.make_move(move)) {
             legal_moves_played++;
@@ -212,17 +250,17 @@ int negamax(int depth, int alpha, int beta, Board& board, int search_ply, bool c
             
             // Late Move Reductions (LMR)
             if (legal_moves_played >= 4 && depth >= 3 && !in_check && 
-                !get_move_capture(move) && !get_move_promoted(move)) {
+                !get_move_capture(move) && !get_move_promoted(move) && !attacks_king_zone) {
                 
-                score = -negamax(depth - 2, -beta, -alpha, board, search_ply + 1, true);
+                score = -negamax(depth - 2 + extension, -beta, -alpha, board, search_ply + 1, true);
                 
                 // Re-Search if the move was surprisingly good
                 if (score > alpha) {
-                    score = -negamax(depth - 1, -beta, -alpha, board, search_ply + 1, true);
+                    score = -negamax(depth - 1 + extension, -beta, -alpha, board, search_ply + 1, true);
                 }
             } else {
                 // Full Depth Search
-                score = -negamax(depth - 1, -beta, -alpha, board, search_ply + 1, true);
+                score = -negamax(depth - 1 + extension, -beta, -alpha, board, search_ply + 1, true);
             }
             
             board.unmake_move(move);
@@ -255,7 +293,7 @@ int negamax(int depth, int alpha, int beta, Board& board, int search_ply, bool c
         if (in_check) {
             return -49000 + search_ply;
         }
-        return 0;
+        return -CONTEMPT_FACTOR;
     }
 
     record_tt(board.get_hash_key(), depth, tt_flag, alpha, current_best_move);

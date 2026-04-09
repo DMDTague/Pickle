@@ -1,5 +1,7 @@
 #include "evaluate.h"
 #include "bit_utils.h"
+#include "attacks.h"
+#include "magics.h"
 
 // -----------------------------------------------------------------------------
 // Piece-Square Tables (Midgame/Aggressive)
@@ -90,32 +92,160 @@ const int* pst[6] = {
 
 int evaluate(const Board& board) {
     int score = 0;
+    Color us = board.get_side_to_move();
+    
+    // We compute the raw material & PST score from White's perspective initially, 
+    // but the multipliers apply based on who the side to move is.
+    int white_multiplier = (us == WHITE) ? OWN_PIECE_DEVAL_PCT : 100;
+    int black_multiplier = (us == BLACK) ? OWN_PIECE_DEVAL_PCT : 100;
+
+    int white_material = 0;
+    int black_material = 0;
+    
+    int white_minor_count = 0;
+    int black_minor_count = 0;
+    int white_rook_count = 0;
+    int black_rook_count = 0;
+
+    Bitboard white_occ = board.get_color_bitboard(WHITE);
+    Bitboard black_occ = board.get_color_bitboard(BLACK);
+    Bitboard all_occ = white_occ | black_occ;
+
+    int w_king_lsb = lsb(board.get_piece_bitboard(KING) & white_occ);
+    int b_king_lsb = lsb(board.get_piece_bitboard(KING) & black_occ);
+    Square w_king_sq = (w_king_lsb != -1) ? (Square)w_king_lsb : SQUARE_COUNT;
+    Square b_king_sq = (b_king_lsb != -1) ? (Square)b_king_lsb : SQUARE_COUNT;
+    
+    auto get_ring = [](Square sq) {
+        if (sq < 0 || sq >= 64) return 0ULL;
+        Bitboard ring = king_attacks[sq];
+        Bitboard ring2 = ring;
+        Bitboard copy = ring;
+        while(copy) {
+            int s = lsb(copy);
+            ring2 |= king_attacks[s];
+            copy &= ~(1ULL << s);
+        }
+        return ring2;
+    };
+    Bitboard w_king_zone = get_ring(w_king_sq);
+    Bitboard b_king_zone = get_ring(b_king_sq);
+    
+    int white_mobility = 0;
+    int black_mobility = 0;
+    int white_king_attackers = 0;
+    int black_king_attackers = 0;
+    
+    int white_initiative = 0;
+    int black_initiative = 0;
 
     // Evaluate White pieces
-    Bitboard white_occ = board.get_color_bitboard(WHITE);
     for (int pt = 0; pt < PIECE_TYPE_COUNT; ++pt) {
         Bitboard pieces = board.get_piece_bitboard((PieceType)pt) & white_occ;
+        if (pt == KNIGHT || pt == BISHOP) white_minor_count += pop_count(pieces);
+        if (pt == ROOK) white_rook_count += pop_count(pieces);
+        
         while (pieces) {
             int sq = lsb(pieces);
-            score += MATERIAL_VALUES[pt];
-            score += pst[pt][sq];
+            white_material += MATERIAL_VALUES[pt];
+            white_material += pst[pt][sq];
+            
+            // Mobility and Attacks
+            Bitboard attacks = 0;
+            if (pt == KNIGHT) attacks = knight_attacks[sq];
+            else if (pt == BISHOP) attacks = get_bishop_attacks(sq, all_occ);
+            else if (pt == ROOK) attacks = get_rook_attacks(sq, all_occ);
+            else if (pt == QUEEN) attacks = get_queen_attacks(sq, all_occ);
+            
+            white_mobility += pop_count(attacks & ~white_occ);
+            
+            // King Hunt
+            if (attacks & b_king_zone) {
+                 white_king_attackers++;
+                 score += KING_HUNT_BONUS; // White attacks Black King
+            }
+            
+            // Initiative: Attacking enemy higher-value pieces or checking
+            if (pt != QUEEN && pt != KING) {
+                if (attacks & (board.get_piece_bitboard(QUEEN) & black_occ)) white_initiative++;
+                if (pt != ROOK && (attacks & (board.get_piece_bitboard(ROOK) & black_occ))) white_initiative++;
+            }
+            if (pt != PAWN && b_king_sq >= 0 && b_king_sq < 64 && (attacks & (1ULL << b_king_sq))) white_initiative += 2; // Check
+            
             pieces &= ~(1ULL << sq);
         }
     }
 
     // Evaluate Black pieces
-    Bitboard black_occ = board.get_color_bitboard(BLACK);
     for (int pt = 0; pt < PIECE_TYPE_COUNT; ++pt) {
         Bitboard pieces = board.get_piece_bitboard((PieceType)pt) & black_occ;
+        if (pt == KNIGHT || pt == BISHOP) black_minor_count += pop_count(pieces);
+        if (pt == ROOK) black_rook_count += pop_count(pieces);
+
         while (pieces) {
             int sq = lsb(pieces);
-            int mirror_sq = sq ^ 56; // Flip the board vertically for Black pieces
-            score -= MATERIAL_VALUES[pt];
-            score -= pst[pt][mirror_sq];
+            int mirror_sq = sq ^ 56;
+            black_material += MATERIAL_VALUES[pt];
+            black_material += pst[pt][mirror_sq];
+            
+            // Mobility and Attacks
+            Bitboard attacks = 0;
+            if (pt == KNIGHT) attacks = knight_attacks[sq];
+            else if (pt == BISHOP) attacks = get_bishop_attacks(sq, all_occ);
+            else if (pt == ROOK) attacks = get_rook_attacks(sq, all_occ);
+            else if (pt == QUEEN) attacks = get_queen_attacks(sq, all_occ);
+            
+            black_mobility += pop_count(attacks & ~black_occ);
+            
+            // King Hunt
+            if (attacks & w_king_zone) {
+                 black_king_attackers++;
+                 score -= KING_HUNT_BONUS; // Black attacks White King
+            }
+            
+            // Initiative
+            if (pt != QUEEN && pt != KING) {
+                if (attacks & (board.get_piece_bitboard(QUEEN) & white_occ)) black_initiative++;
+                if (pt != ROOK && (attacks & (board.get_piece_bitboard(ROOK) & white_occ))) black_initiative++;
+            }
+            if (pt != PAWN && w_king_sq >= 0 && w_king_sq < 64 && (attacks & (1ULL << w_king_sq))) black_initiative += 2; // Check
+            
             pieces &= ~(1ULL << sq);
         }
     }
 
+    // Apply Material & Devaluation
+    white_material = (white_material * white_multiplier) / 100;
+    black_material = (black_material * black_multiplier) / 100;
+    score += (white_material - black_material);
+    
+    // Apply Mobility
+    score += (white_mobility - black_mobility) * MOBILITY_WEIGHT;
+    
+    // Apply Initiative
+    score += (white_initiative - black_initiative) * INITIATIVE_BONUS;
+
+    // Asymmetry
+    if (white_minor_count != black_minor_count || white_rook_count != black_rook_count) {
+        if (us == WHITE) score += ASYMMETRY_BONUS;
+        else score -= ASYMMETRY_BONUS;
+    }
+
+    // Pawn Storming Enemy Shield
+    Bitboard white_pawns = board.get_piece_bitboard(PAWN) & white_occ;
+    Bitboard black_pawns = board.get_piece_bitboard(PAWN) & black_occ;
+    
+    Bitboard w_king_shield = (w_king_sq >= 0 && w_king_sq < 64) ? (king_attacks[w_king_sq] & white_pawns) : 0;
+    Bitboard b_king_shield = (b_king_sq >= 0 && b_king_sq < 64) ? (king_attacks[b_king_sq] & black_pawns) : 0;
+    
+    // If white pawns attack black's king shield
+    Bitboard w_pawn_attacks = ((white_pawns << 9) & 0xFEFEFEFEFEFEFEFEULL) | ((white_pawns << 7) & 0x7F7F7F7F7F7F7F7FULL);
+    if (w_pawn_attacks & b_king_shield) score += PAWN_STORM_BONUS;
+    
+    // If black pawns attack white's king shield
+    Bitboard b_pawn_attacks = ((black_pawns >> 9) & 0x7F7F7F7F7F7F7F7FULL) | ((black_pawns >> 7) & 0xFEFEFEFEFEFEFEFEULL);
+    if (b_pawn_attacks & w_king_shield) score -= PAWN_STORM_BONUS;
+
     // Orient relative to side to move
-    return (board.get_side_to_move() == WHITE) ? score : -score;
+    return (us == WHITE) ? score : -score;
 }

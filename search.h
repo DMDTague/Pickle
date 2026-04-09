@@ -21,7 +21,7 @@ extern int history_moves[12][64];
 void init_mvv_lva();
 void clear_heuristics();
 // Quiescence Search: resolves all tactical captures to prevent the horizon effect.
-int quiescence(int alpha, int beta, Board& board);
+int quiescence(int alpha, int beta, Board& board, int qs_ply = 0);
 
 // Negamax (Alpha-Beta): The core recursive search loop
 // depth: remaining depth to search
