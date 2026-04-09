@@ -17,19 +17,25 @@ void set_time_limits(long long time_left, long long inc, long long movetime, int
     tm.depth_limit = depth;
 
     if (movetime > 0) {
+        tm.optimum_time = movetime;
+        tm.max_time = movetime;
         tm.stop_time = tm.start_time + movetime;
     } else if (time_left > 0) {
         // Allocate ~30 moves remaining + exact increment for safety
-        long long allocated_time = (time_left / 30) + inc;
-        // Never exceed actual time left, keep a 50ms buffer
-        if (allocated_time > time_left - 50) {
-            allocated_time = time_left - 50;
-        }
-        if (allocated_time < 0) allocated_time = 0;
+        tm.optimum_time = (time_left / 30) + (inc / 2);
+        tm.max_time = (time_left / 10) + inc;
+
+        if (tm.optimum_time > time_left - 50) tm.optimum_time = time_left - 50;
+        if (tm.max_time > time_left - 50) tm.max_time = time_left - 50;
         
-        tm.stop_time = tm.start_time + allocated_time;
+        if (tm.optimum_time < 0) tm.optimum_time = 0;
+        if (tm.max_time < 0) tm.max_time = 0;
+        
+        tm.stop_time = tm.start_time + tm.max_time; // Hard stop check_time triggers on max
     } else {
         // Infinite time search (will be stopped externally or heavily bounded by depth)
+        tm.optimum_time = -1;
+        tm.max_time = -1;
         tm.stop_time = -1;
     }
 }

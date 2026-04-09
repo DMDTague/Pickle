@@ -315,6 +315,7 @@ void search_position(Board& board, int depth) {
     if (target_depth <= 0) target_depth = 64; // MAX depth loop
 
     auto start_time = std::chrono::high_resolution_clock::now();
+    int previous_score = 0;
 
     for (int current_depth = 1; current_depth <= target_depth; current_depth++) {
         
@@ -322,7 +323,7 @@ void search_position(Board& board, int depth) {
 
         // If time was up during the calculation of this depth, 
         // the results are severely tainted. Discard them.
-        if (tm.time_is_up) {
+        if (tm.time_is_up || tm.stopped) {
             break; 
         }
 
@@ -349,6 +350,25 @@ void search_position(Board& board, int depth) {
             std::cout << " score mate " << -(score + 49000 + 1) / 2 << std::endl;
         } else {
             std::cout << " score cp " << score << std::endl;
+        }
+
+        // Time Management Soft Bounds & Extension
+        if (current_depth > 1) {
+            if (std::abs(score - previous_score) > 50) {
+                // Eval dropped or spiked, we are in a critical node!
+                if (tm.optimum_time != -1) {
+                    tm.optimum_time += tm.optimum_time / 2; // Extend optimum by 50%
+                    if (tm.optimum_time > tm.max_time) tm.optimum_time = tm.max_time; // Cap at max
+                }
+            }
+        }
+        previous_score = score;
+
+        if (tm.optimum_time != -1) {
+            long long elapsed = get_time_ms() - tm.start_time;
+            if (elapsed >= tm.optimum_time) {
+                break; // Break gracefully
+            }
         }
     }
 

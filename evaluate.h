@@ -28,9 +28,9 @@ const int MATERIAL_VALUES[6] = {
 // Nightmare Evaluation Parameters
 // -----------------------------------------------------------------------------
 const int CONTEMPT_FACTOR       = 150; // Points lost for drawing
-const int KING_HUNT_BONUS       = 200; // Points for attacking King Zone
+const int KING_HUNT_BONUS       = 50;  // Points for attacking King Zone
 const int MOBILITY_WEIGHT       = 5;   // Points per square of mobility
-const int INITIATIVE_BONUS      = 50;  // Points for creating major threats
+const int INITIATIVE_BONUS      = 20;  // Points for creating major threats
 const int ASYMMETRY_BONUS       = 30;  // Points for material imbalance
 const int PAWN_STORM_BONUS      = 100; // Points for blowing up pawn shields
 const int OWN_PIECE_DEVAL_PCT   = 90;  // Devalue own pieces to encourage sacrifice

@@ -7,6 +7,8 @@ long long get_time_ms();
 struct TimeManager {
     long long start_time;
     long long stop_time;
+    long long optimum_time;
+    long long max_time;
     int depth_limit;
     bool time_is_up;
     bool stopped; // external flag to forcefully stop searching

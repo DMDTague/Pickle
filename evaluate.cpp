@@ -162,7 +162,6 @@ int evaluate(const Board& board) {
             // King Hunt
             if (attacks & b_king_zone) {
                  white_king_attackers++;
-                 score += KING_HUNT_BONUS; // White attacks Black King
             }
             
             // Initiative: Attacking enemy higher-value pieces or checking
@@ -200,7 +199,6 @@ int evaluate(const Board& board) {
             // King Hunt
             if (attacks & w_king_zone) {
                  black_king_attackers++;
-                 score -= KING_HUNT_BONUS; // Black attacks White King
             }
             
             // Initiative
@@ -224,6 +222,14 @@ int evaluate(const Board& board) {
     
     // Apply Initiative
     score += (white_initiative - black_initiative) * INITIATIVE_BONUS;
+
+    // Coordination Scaling
+    if (white_king_attackers > 0) {
+        score += (white_king_attackers * white_king_attackers * KING_HUNT_BONUS) / 2;
+    }
+    if (black_king_attackers > 0) {
+        score -= (black_king_attackers * black_king_attackers * KING_HUNT_BONUS) / 2;
+    }
 
     // Asymmetry
     if (white_minor_count != black_minor_count || white_rook_count != black_rook_count) {
