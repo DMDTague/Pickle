@@ -53,6 +53,35 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function invertTablebaseCategory(category) {
+  const opposite = {
+    win: 'loss',
+    'syzygy-win': 'syzygy-loss',
+    'maybe-win': 'maybe-loss',
+    'cursed-win': 'blessed-loss',
+    draw: 'draw',
+    'blessed-loss': 'cursed-win',
+    'maybe-loss': 'maybe-win',
+    'syzygy-loss': 'syzygy-win',
+    loss: 'win',
+    unknown: 'unknown',
+  };
+  return opposite[category] || 'unknown';
+}
+
+function normalizeTablebaseMove(move) {
+  return {
+    uci: move.uci,
+    san: move.san || move.uci,
+    outcome: invertTablebaseCategory(move.category),
+    rawCategory: move.category,
+    dtz: move.dtz ?? null,
+    dtm: move.dtm ?? null,
+    zeroing: Boolean(move.zeroing),
+    checkmate: Boolean(move.checkmate),
+  };
+}
+
 async function probeTablebase(fen) {
   const pieceCount = pieceCountFromFen(fen);
   if (pieceCount < 2 || pieceCount > 7) return null;
@@ -80,14 +109,17 @@ async function probeTablebase(fen) {
           return null;
         }
 
-        const best = data.moves[0];
-        if (!best?.uci || !/^[a-h][1-8][a-h][1-8][qrbn]?$/.test(best.uci)) return null;
+        const moves = data.moves
+          .filter((move) => move?.uci && /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move.uci))
+          .map(normalizeTablebaseMove);
+        if (moves.length === 0) return null;
 
         return {
-          move: best.uci,
+          move: moves[0].uci,
           category: data.category,
           dtz: data.dtz ?? null,
           dtm: data.dtm ?? null,
+          moves,
         };
       }
 
@@ -129,6 +161,7 @@ async function runSearch(message) {
       detail: tablebase.category,
       dtz: tablebase.dtz,
       dtm: tablebase.dtm,
+      tablebaseMoves: tablebase.moves,
     };
   }
 
@@ -139,7 +172,14 @@ async function runSearch(message) {
     ['string', 'number', 'number'],
     [message.fen, message.depth, message.movetime],
   );
-  const sourceCode = engine.ccall('pickle_last_source', 'number', [], []);
+
+  let sourceCode = 0;
+  try {
+    sourceCode = engine.ccall('pickle_last_source', 'number', [], []);
+  } catch {
+    // Older CDN fallbacks predate source reporting. Treat them as search.
+    sourceCode = 0;
+  }
 
   return {
     type: 'result',
@@ -151,6 +191,7 @@ async function runSearch(message) {
     nodes: engine.ccall('pickle_last_nodes', 'number', [], []),
     source: sourceName(sourceCode),
     detail: '',
+    tablebaseMoves: [],
   };
 }
 
