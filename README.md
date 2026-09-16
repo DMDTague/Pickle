@@ -2,6 +2,8 @@
 
 A chess engine I built from scratch in C++, now playable in the browser.
 
+**Play Pickle:** https://pickle-dmdtagues-projects.vercel.app
+
 Pickle started as an excuse to learn what actually sits underneath a chess engine: bitboards, move generation, evaluation, search, hashing, time management, and all the small decisions that turn legal moves into good ones. It has gradually become a real engine project rather than a toy move picker.
 
 ## Engine
@@ -35,6 +37,8 @@ That gives the engine a bias toward active positions while still requiring compe
 ## Play against Pickle
 
 The `web/` directory contains a React interface for playing directly against the C++ engine.
+
+**Live:** https://pickle-dmdtagues-projects.vercel.app
 
 The engine is compiled to WebAssembly and runs inside a Web Worker, so the browser is running **Pickle itself** rather than replacing it with another chess engine. `chess.js` handles browser-side game state and legal interaction, while `react-chessboard` provides the board component.
 
