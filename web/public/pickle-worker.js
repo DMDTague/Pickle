@@ -147,6 +147,40 @@ function sourceName(code) {
 }
 
 async function runSearch(message) {
+  const engine = await getEngine();
+
+  // Immediate checkmate is absolute. Probe it locally before asking an
+  // external tablebase so a mate in one can never be displaced by another
+  // game-theoretically winning move.
+  let immediateMate = '0000';
+  try {
+    immediateMate = engine.ccall(
+      'pickle_mate_in_one',
+      'string',
+      ['string'],
+      [message.fen],
+    );
+  } catch {
+    // The pinned emergency CDN fallback may predate this export. In that rare
+    // degraded path we continue to tablebase/search instead of killing play.
+    immediateMate = '0000';
+  }
+
+  if (immediateMate && immediateMate !== '0000') {
+    return {
+      type: 'result',
+      requestId: message.requestId,
+      fen: message.fen,
+      move: immediateMate,
+      score: null,
+      depth: 1,
+      nodes: 0,
+      source: 'mate',
+      detail: 'mate-in-one',
+      tablebaseMoves: [],
+    };
+  }
+
   const tablebase = await probeTablebase(message.fen);
   if (tablebase) {
     return {
@@ -165,7 +199,6 @@ async function runSearch(message) {
     };
   }
 
-  const engine = await getEngine();
   const move = engine.ccall(
     'pickle_best_move',
     'string',
