@@ -1,17 +1,31 @@
 let modulePromise = null;
 
+const ENGINE_COMMIT = 'b75b2b8774757c12567e5db01efb402875a76c9b';
+const ENGINE_CDN = `https://cdn.jsdelivr.net/gh/DMDTague/Pickle@${ENGINE_COMMIT}/web/public/engine`;
+let engineBase = '/engine';
+
 function resetEngine() {
   modulePromise = null;
 }
 
+function loadEngineFactory() {
+  if (typeof self.createPickleModule === 'function') return;
+
+  try {
+    importScripts('/engine/pickle.js');
+    engineBase = '/engine';
+  } catch {
+    importScripts(`${ENGINE_CDN}/pickle.js`);
+    engineBase = ENGINE_CDN;
+  }
+}
+
 async function getEngine() {
   if (!modulePromise) {
-    if (typeof self.createPickleModule !== 'function') {
-      importScripts('/engine/pickle.js');
-    }
+    loadEngineFactory();
 
     modulePromise = self.createPickleModule({
-      locateFile: (path) => `/engine/${path}`,
+      locateFile: (path) => `${engineBase}/${path}`,
       noInitialRun: true,
     }).then((engine) => {
       engine.ccall('pickle_init', null, [], []);
