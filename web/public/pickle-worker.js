@@ -1,8 +1,15 @@
 let modulePromise = null;
 
+function resetEngine() {
+  modulePromise = null;
+}
+
 async function getEngine() {
   if (!modulePromise) {
-    importScripts('/engine/pickle.js');
+    if (typeof self.createPickleModule !== 'function') {
+      importScripts('/engine/pickle.js');
+    }
+
     modulePromise = self.createPickleModule({
       locateFile: (path) => `/engine/${path}`,
       noInitialRun: true,
@@ -22,7 +29,8 @@ self.onmessage = async (event) => {
       await getEngine();
       self.postMessage({ type: 'ready' });
     } catch (error) {
-      self.postMessage({ type: 'error', message: String(error) });
+      resetEngine();
+      self.postMessage({ type: 'error', message: String(error), recoverable: true });
     }
     return;
   }
@@ -52,10 +60,12 @@ self.onmessage = async (event) => {
       nodes,
     });
   } catch (error) {
+    resetEngine();
     self.postMessage({
       type: 'error',
       requestId: message.requestId,
       message: String(error),
+      recoverable: true,
     });
   }
 };
