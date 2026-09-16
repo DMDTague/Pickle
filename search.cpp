@@ -42,6 +42,42 @@ void add_history(Board& board, Move move, int bonus) {
     value = std::max(-200000, std::min(200000, value));
 }
 
+bool has_legal_move(Board& board) {
+    MoveList replies;
+    generate_moves(board, replies);
+    for (int i = 0; i < replies.count; ++i) {
+        Move reply = replies.moves[i];
+        if (board.make_move(reply)) {
+            board.unmake_move(reply);
+            return true;
+        }
+    }
+    return false;
+}
+
+Move find_mate_in_one(Board& board) {
+    MoveList list;
+    generate_moves(board, list);
+    Move best = 0;
+    int best_tiebreak = -1;
+
+    for (int i = 0; i < list.count; ++i) {
+        Move move = list.moves[i];
+        if (!board.make_move(move)) continue;
+        bool mate = in_check(board) && !has_legal_move(board);
+        board.unmake_move(move);
+        if (!mate) continue;
+
+        int promoted = get_move_promoted(move);
+        int tiebreak = promoted ? MATERIAL_VALUES[promoted] : 0;
+        if (!best || tiebreak > best_tiebreak) {
+            best = move;
+            best_tiebreak = tiebreak;
+        }
+    }
+    return best;
+}
+
 } // namespace
 
 U64 nodes_searched = 0;
@@ -97,7 +133,7 @@ int score_move(Board& board, Move move, Move tt_move, int search_ply) {
     return history_moves[history_index(board, move)][get_move_target(move)];
 }
 
-int quiescence(int alpha, int beta, Board& board, int qs_ply) {
+int quiescence(int alpha, int beta, Board& board, int search_ply, int qs_ply) {
     if ((nodes_searched & 511ULL) == 0) check_time();
     if (tm.time_is_up) return 0;
     ++nodes_searched;
@@ -135,7 +171,7 @@ int quiescence(int alpha, int beta, Board& board, int qs_ply) {
 
         if (!board.make_move(move)) continue;
         ++legal;
-        int score = -quiescence(-beta, -alpha, board, qs_ply + 1);
+        int score = -quiescence(-beta, -alpha, board, search_ply + 1, qs_ply + 1);
         board.unmake_move(move);
 
         if (tm.time_is_up) return 0;
@@ -143,7 +179,7 @@ int quiescence(int alpha, int beta, Board& board, int qs_ply) {
         if (score > alpha) alpha = score;
     }
 
-    if (checked && legal == 0) return -MATE_SCORE + qs_ply;
+    if (checked && legal == 0) return -MATE_SCORE + search_ply;
     return alpha;
 }
 
@@ -156,13 +192,13 @@ int negamax(int depth, int alpha, int beta, Board& board, int search_ply, bool c
     if (search_ply > 0 && board.is_draw()) return -CONTEMPT_FACTOR;
 
     bool checked = in_check(board);
-    if (depth <= 0) return quiescence(alpha, beta, board, 0);
+    if (depth <= 0) return quiescence(alpha, beta, board, search_ply, 0);
 
     bool pv_node = (beta - alpha) > 1;
     int old_alpha = alpha;
 
     Move tt_move = 0;
-    int tt_score = probe_tt(board.get_hash_key(), depth, alpha, beta, tt_move);
+    int tt_score = probe_tt(board.get_hash_key(), depth, alpha, beta, tt_move, search_ply);
     if (tt_score != TT_UNKNOWN) {
         if (search_ply == 0 && tt_move) best_move = tt_move;
         return tt_score;
@@ -246,6 +282,7 @@ int negamax(int depth, int alpha, int beta, Board& board, int search_ply, bool c
         if (tm.time_is_up) return 0;
 
         if (score >= beta) {
+            if (search_ply == 0) best_move = move;
             if (quiet && search_ply < MAX_PLY) {
                 if (killer_moves[0][search_ply] != move) {
                     killer_moves[1][search_ply] = killer_moves[0][search_ply];
@@ -253,7 +290,7 @@ int negamax(int depth, int alpha, int beta, Board& board, int search_ply, bool c
                 }
                 add_history(board, move, depth * depth * 32);
             }
-            record_tt(board.get_hash_key(), depth, TT_BETA, beta, move);
+            record_tt(board.get_hash_key(), depth, TT_BETA, beta, move, search_ply);
             return beta;
         }
 
@@ -273,7 +310,7 @@ int negamax(int depth, int alpha, int beta, Board& board, int search_ply, bool c
     }
 
     if (alpha == old_alpha) tt_flag = TT_ALPHA;
-    record_tt(board.get_hash_key(), depth, tt_flag, alpha, node_best);
+    record_tt(board.get_hash_key(), depth, tt_flag, alpha, node_best, search_ply);
     return alpha;
 }
 
@@ -284,6 +321,20 @@ Move search_best_move(Board& board, int depth, bool print_info) {
     last_search_score = 0;
     last_search_depth = 0;
     clear_heuristics();
+
+    Move mate_in_one = find_mate_in_one(board);
+    if (mate_in_one) {
+        best_move = mate_in_one;
+        previous_best_move = mate_in_one;
+        last_search_score = MATE_SCORE - 1;
+        last_search_depth = 1;
+        if (print_info) {
+            std::cout << "info depth 1 nodes " << nodes_searched
+                      << " time 0 nps 0 score mate 1 pv "
+                      << move_to_string(mate_in_one) << std::endl;
+        }
+        return mate_in_one;
+    }
 
     int target_depth = tm.depth_limit > 0 ? tm.depth_limit : depth;
     if (target_depth <= 0) target_depth = 64;

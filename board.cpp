@@ -456,7 +456,7 @@ void Board::unmake_move(Move move) {
     en_passant_sq = history[ply].en_passant_sq;
     half_move_clock = history[ply].half_move_clock;
     PieceType cap_piece = history[ply].captured_piece;
-    hash_key = history[ply].hash_key;
+    U64 restored_hash = history[ply].hash_key;
 
     // Handle Promotion Reverse
     if (promoted) {
@@ -484,4 +484,6 @@ void Board::unmake_move(Move move) {
         else if (to == G8) move_piece(F8, H8, us, ROOK);
         else if (to == C8) move_piece(D8, A8, us, ROOK);
     }
+
+    hash_key = restored_hash;
 }
