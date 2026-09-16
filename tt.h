@@ -26,7 +26,7 @@ extern std::vector<TTEntry> TT;
 
 void init_tt(int size_mb);
 void clear_tt();
-int probe_tt(U64 hash, int depth, int alpha, int beta, Move& tt_move);
-void record_tt(U64 hash, int depth, int flag, int score, Move best_move);
+int probe_tt(U64 hash, int depth, int alpha, int beta, Move& tt_move, int search_ply);
+void record_tt(U64 hash, int depth, int flag, int score, Move best_move, int search_ply);
 
 #endif // TT_H
