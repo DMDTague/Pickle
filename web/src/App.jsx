@@ -9,6 +9,8 @@ const LEVELS = [
   { id: 'max', label: 'Max', depth: 11, movetime: 3000 },
 ];
 
+const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+
 function colorName(color) {
   return color === 'w' ? 'White' : 'Black';
 }
@@ -83,6 +85,17 @@ function MoveList({ moves }) {
   );
 }
 
+function findKingSquare(game, kingColor) {
+  for (const file of FILES) {
+    for (let rank = 1; rank <= 8; rank += 1) {
+      const square = `${file}${rank}`;
+      const piece = game.get(square);
+      if (piece?.type === 'k' && piece.color === kingColor) return square;
+    }
+  }
+  return '';
+}
+
 export default function App() {
   const gameRef = useRef(new Chess());
   const workerRef = useRef(null);
@@ -102,6 +115,8 @@ export default function App() {
   const [whiteEval, setWhiteEval] = useState(0);
   const [searchInfo, setSearchInfo] = useState({ depth: 0, nodes: 0 });
   const [workerEpoch, setWorkerEpoch] = useState(0);
+  const [selectedSquare, setSelectedSquare] = useState('');
+  const [moveOptionStyles, setMoveOptionStyles] = useState({});
 
   const level = LEVELS.find((item) => item.id === levelId) || LEVELS[2];
   const game = gameRef.current;
@@ -117,6 +132,11 @@ export default function App() {
     }
   }
 
+  function clearSelection() {
+    setSelectedSquare('');
+    setMoveOptionStyles({});
+  }
+
   function syncPosition() {
     setFen(gameRef.current.fen());
   }
@@ -129,6 +149,7 @@ export default function App() {
         to: uci.slice(2, 4),
         promotion: uci[4] || 'q',
       });
+      clearSelection();
       syncPosition();
       return true;
     } catch {
@@ -200,6 +221,7 @@ export default function App() {
     if (!engineReady || engineError || thinking || current.isGameOver()) return;
     if (current.turn() === humanColor) return;
 
+    clearSelection();
     const requestId = ++requestSeqRef.current;
     activeRequestRef.current = requestId;
     pendingFenRef.current = current.fen();
@@ -226,17 +248,59 @@ export default function App() {
 
   useEffect(() => () => clearSearchWatchdog(), []);
 
-  function onPieceDrop({ sourceSquare, targetSquare }) {
-    if (!targetSquare || thinking || gameRef.current.isGameOver()) return false;
+  function showMoveOptions(square) {
+    const current = gameRef.current;
+    if (thinking || current.isGameOver() || current.turn() !== humanColor) {
+      clearSelection();
+      return false;
+    }
+
+    const piece = current.get(square);
+    if (!piece || piece.color !== humanColor) {
+      clearSelection();
+      return false;
+    }
+
+    const legalMoves = current.moves({ square, verbose: true });
+    if (legalMoves.length === 0) {
+      clearSelection();
+      return false;
+    }
+
+    const styles = {};
+    for (const move of legalMoves) {
+      const isCapture = Boolean(move.captured);
+      styles[move.to] = isCapture
+        ? {
+            background: 'radial-gradient(circle, transparent 0 58%, rgba(19, 23, 17, 0.28) 60% 78%, transparent 80%)',
+          }
+        : {
+            background: 'radial-gradient(circle, rgba(19, 23, 17, 0.30) 0 17%, transparent 19%)',
+          };
+    }
+
+    styles[square] = {
+      background: 'rgba(238, 214, 92, 0.58)',
+      boxShadow: 'inset 0 0 0 2px rgba(82, 73, 29, 0.20)',
+    };
+
+    setSelectedSquare(square);
+    setMoveOptionStyles(styles);
+    return true;
+  }
+
+  function makeHumanMove(from, to) {
+    if (!to || thinking || gameRef.current.isGameOver()) return false;
     if (gameRef.current.turn() !== humanColor) return false;
 
     try {
-      const piece = gameRef.current.get(sourceSquare);
+      const piece = gameRef.current.get(from);
       if (!piece || piece.color !== humanColor) return false;
 
-      const targetRank = targetSquare[1];
+      const targetRank = to[1];
       const promotion = piece.type === 'p' && (targetRank === '1' || targetRank === '8') ? 'q' : undefined;
-      gameRef.current.move({ from: sourceSquare, to: targetSquare, promotion });
+      gameRef.current.move({ from, to, promotion });
+      clearSelection();
       syncPosition();
       return true;
     } catch {
@@ -244,8 +308,37 @@ export default function App() {
     }
   }
 
+  function onSquareClick({ square }) {
+    if (thinking || gameRef.current.isGameOver()) return;
+    if (gameRef.current.turn() !== humanColor) return;
+
+    if (!selectedSquare) {
+      showMoveOptions(square);
+      return;
+    }
+
+    const legalMoves = gameRef.current.moves({ square: selectedSquare, verbose: true });
+    const chosenMove = legalMoves.find((move) => move.to === square);
+
+    if (chosenMove && makeHumanMove(selectedSquare, square)) return;
+
+    const clickedPiece = gameRef.current.get(square);
+    if (clickedPiece?.color === humanColor) {
+      showMoveOptions(square);
+    } else {
+      clearSelection();
+    }
+  }
+
+  function onPieceDrop({ sourceSquare, targetSquare }) {
+    const moved = makeHumanMove(sourceSquare, targetSquare);
+    if (!moved) clearSelection();
+    return moved;
+  }
+
   function startNewGame(color = humanColor) {
     clearSearchWatchdog();
+    clearSelection();
     ++requestSeqRef.current;
     activeRequestRef.current = requestSeqRef.current;
     pendingFenRef.current = '';
@@ -261,6 +354,7 @@ export default function App() {
 
   function undoTurn() {
     if (thinking || moves.length === 0) return;
+    clearSelection();
     gameRef.current.undo();
     if (gameRef.current.history().length > 0 && gameRef.current.turn() !== humanColor) {
       gameRef.current.undo();
@@ -271,15 +365,31 @@ export default function App() {
   }
 
   const squareStyles = useMemo(() => {
-    if (!lastMove) return {};
-    const highlight = { background: 'rgba(238, 214, 92, 0.44)' };
-    return { [lastMove.from]: highlight, [lastMove.to]: highlight };
-  }, [fen]);
+    const styles = {};
+
+    if (lastMove) {
+      const lastMoveHighlight = { background: 'rgba(238, 214, 92, 0.38)' };
+      styles[lastMove.from] = lastMoveHighlight;
+      styles[lastMove.to] = lastMoveHighlight;
+    }
+
+    if (gameRef.current.inCheck()) {
+      const kingSquare = findKingSquare(gameRef.current, gameRef.current.turn());
+      if (kingSquare) {
+        styles[kingSquare] = {
+          background: 'radial-gradient(circle, rgba(194, 67, 58, 0.72) 0%, rgba(170, 55, 49, 0.46) 58%, transparent 76%)',
+        };
+      }
+    }
+
+    return { ...styles, ...moveOptionStyles };
+  }, [fen, lastMove, moveOptionStyles]);
 
   const boardOptions = useMemo(() => ({
     id: 'pickle-board',
     position: fen,
     onPieceDrop,
+    onSquareClick,
     boardOrientation: orientation,
     animationDurationInMs: 170,
     lightSquareStyle: { backgroundColor: '#e7e9cf' },
@@ -290,7 +400,7 @@ export default function App() {
       overflow: 'hidden',
       boxShadow: '0 18px 45px rgba(0, 0, 0, 0.28)',
     },
-  }), [fen, orientation, squareStyles, thinking, humanColor]);
+  }), [fen, orientation, squareStyles, thinking, humanColor, selectedSquare]);
 
   const topColor = orientation === 'white' ? 'b' : 'w';
   const bottomColor = orientation === 'white' ? 'w' : 'b';
