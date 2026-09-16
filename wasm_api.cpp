@@ -7,6 +7,7 @@
 #include "tt.h"
 #include "uci.h"
 #include "zobrist.h"
+#include <algorithm>
 #include <string>
 
 #ifdef __EMSCRIPTEN__
@@ -42,8 +43,7 @@ PICKLE_EXPORT const char* pickle_best_move(const char* fen, int depth, int movet
     Board board;
     board.parse_fen(fen ? std::string(fen) : std::string());
 
-    if (depth < 1) depth = 8;
-    if (depth > 32) depth = 32;
+    depth = std::clamp(depth, 1, 32);
     set_time_limits(-1, 0, movetime_ms, depth);
 
     Move move = search_best_move(board, depth, false);
@@ -66,8 +66,9 @@ PICKLE_EXPORT int pickle_last_depth() {
     return last_search_depth;
 }
 
-PICKLE_EXPORT unsigned long long pickle_last_nodes() {
-    return static_cast<unsigned long long>(nodes_searched);
+PICKLE_EXPORT int pickle_last_nodes() {
+    constexpr U64 JS_SAFE_NODE_CAP = 2147483647ULL;
+    return static_cast<int>(std::min(nodes_searched, JS_SAFE_NODE_CAP));
 }
 
 } // extern "C"
