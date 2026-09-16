@@ -2,7 +2,7 @@
 """Generate Pickle's compact opening book from the official Stockfish books repo.
 
 Source: official-stockfish/books, 8moves_v3.pgn.zip (CC0-1.0)
-Pinned revision and SHA-384 digest make regeneration deterministic.
+Pinned revision and raw archive SHA-384 digest make regeneration deterministic.
 """
 
 from __future__ import annotations
@@ -27,7 +27,8 @@ BOOK_URL = (
     "https://raw.githubusercontent.com/official-stockfish/books/"
     f"{STOCKFISH_BOOKS_COMMIT}/{BOOK_ARCHIVE}"
 )
-EXPECTED_SHA384_B64 = "hnlrIvi1xbnTt8z3AM2LW87YUCNsrcTTjqlAUBRf80SUCx9Zaq2hlntlimtoEBIn"
+# SHA-384 of the raw ZIP bytes at the pinned commit above.
+EXPECTED_SHA384_B64 = "AoBfMaMZlFdkNLJ6nX7DnL0t1YR+PHAmIFO1+DIH12sexBWTep6t76DxXe05BU5f"
 MAX_PLIES = 16
 MIN_OCCURRENCES = 2
 MAX_MOVES_PER_POSITION = 4
