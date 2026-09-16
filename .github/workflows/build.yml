@@ -2,11 +2,12 @@ name: Build Pickle
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/opening-book-syzygy]
     paths:
       - '*.cpp'
       - '*.h'
       - 'CMakeLists.txt'
+      - 'opening_book_data.inc'
       - 'tests/**'
       - 'scripts/**'
       - 'web/src/**'
@@ -21,6 +22,7 @@ on:
       - '*.cpp'
       - '*.h'
       - 'CMakeLists.txt'
+      - 'opening_book_data.inc'
       - 'tests/**'
       - 'scripts/**'
       - 'web/src/**'
@@ -44,6 +46,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Generate Stockfish opening book
+        run: |
+          python -m pip install --disable-pip-version-check python-chess==1.999
+          python scripts/generate_opening_book.py --output opening_book_data.inc
+          ! grep -q 'STOCKFISH_BOOK_ENTRY_COUNT = 0' opening_book_data.inc
+
       - name: Build native Pickle
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -52,28 +65,36 @@ jobs:
       - name: Verify make/unmake hash invariant
         run: ./build/pickle_regression
 
-      - name: Smoke-test UCI search
+      - name: Verify opening book at start position
         run: |
-          printf 'uci\nisready\nposition startpos\ngo depth 3\nquit\n' | ./build/pickle | tee /tmp/pickle.log
+          printf 'uci\nisready\nposition startpos\ngo depth 3\nquit\n' | ./build/pickle | tee /tmp/pickle-book.log
+          grep -q 'option name OwnBook type check default true' /tmp/pickle-book.log
+          grep -q 'info string opening book' /tmp/pickle-book.log
+          grep -Eq '^bestmove [a-h][1-8][a-h][1-8][qrbn]?$' /tmp/pickle-book.log
+
+      - name: Smoke-test UCI search without book
+        run: |
+          printf 'uci\nisready\nsetoption name OwnBook value false\nposition startpos\ngo depth 3\nquit\n' | ./build/pickle | tee /tmp/pickle.log
           grep -q 'uciok' /tmp/pickle.log
           grep -q 'readyok' /tmp/pickle.log
           grep -Eq '^bestmove [a-h][1-8][a-h][1-8][qrbn]?$' /tmp/pickle.log
+          ! grep -q 'info string opening book' /tmp/pickle.log
 
       - name: Regression-test exact promotion mates from Dylan game
         run: |
-          printf 'position fen 8/8/8/6k1/7p/8/3nrp2/7K b - - 0 1\ngo depth 3\nquit\n' \
+          printf 'setoption name OwnBook value false\nposition fen 8/8/8/6k1/7p/8/3nrp2/7K b - - 0 1\ngo depth 3\nquit\n' \
             | ./build/pickle | tee /tmp/pickle-mate-f.log
           grep -Eq '^bestmove f2f1[qr]$' /tmp/pickle-mate-f.log
           grep -q 'score mate 1' /tmp/pickle-mate-f.log
 
-          printf 'position fen b7/8/8/6k1/8/8/r6p/1n3K2 b - - 0 1\ngo depth 3\nquit\n' \
+          printf 'setoption name OwnBook value false\nposition fen b7/8/8/6k1/8/8/r6p/1n3K2 b - - 0 1\ngo depth 3\nquit\n' \
             | ./build/pickle | tee /tmp/pickle-mate-h.log
           grep -Eq '^bestmove h2h1[qr]$' /tmp/pickle-mate-h.log
           grep -q 'score mate 1' /tmp/pickle-mate-h.log
 
       - name: Regression-test timed depth 11 search
         run: |
-          printf 'position startpos moves e2e4 b8c6 d2d4 g8f6 e4e5 h7h5\ngo depth 11 movetime 3000\nquit\n' \
+          printf 'setoption name OwnBook value false\nposition startpos moves e2e4 b8c6 d2d4 g8f6 e4e5 h7h5\ngo depth 11 movetime 3000\nquit\n' \
             | timeout 8s ./build/pickle | tee /tmp/pickle-depth11.log
           grep -Eq '^bestmove [a-h][1-8][a-h][1-8][qrbn]?$' /tmp/pickle-depth11.log
 
@@ -96,16 +117,16 @@ jobs:
           npm install
           npm run build
 
-      - name: Commit generated browser engine
+      - name: Commit generated browser engine and opening book
         if: github.event_name == 'push'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add web/public/engine/pickle.js web/public/engine/pickle_web.wasm
+          git add opening_book_data.inc web/public/engine/pickle.js web/public/engine/pickle_web.wasm
           if git diff --cached --quiet; then
-            echo 'Generated WebAssembly is already current.'
+            echo 'Generated opening book and WebAssembly are already current.'
           else
-            git commit -m 'Build Pickle WebAssembly [skip ci]'
+            git commit -m 'Build Pickle book and WebAssembly [skip ci]'
             git pull --rebase
             git push
           fi
