@@ -11,6 +11,7 @@ set(PICKLE_CORE
     evaluate.cpp
     magics.cpp
     movegen.cpp
+    opening_book.cpp
     search.cpp
     time_manager.cpp
     tt.cpp
@@ -32,7 +33,7 @@ if(EMSCRIPTEN)
         "-sMODULARIZE=1"
         "-sEXPORT_NAME=createPickleModule"
         "-sFILESYSTEM=0"
-        "-sEXPORTED_FUNCTIONS=['_pickle_init','_pickle_best_move','_pickle_eval','_pickle_last_score','_pickle_last_depth','_pickle_last_nodes','_malloc','_free']"
+        "-sEXPORTED_FUNCTIONS=['_pickle_init','_pickle_best_move','_pickle_eval','_pickle_last_score','_pickle_last_depth','_pickle_last_nodes','_pickle_last_source','_malloc','_free']"
         "-sEXPORTED_RUNTIME_METHODS=['ccall']"
     )
 else()
