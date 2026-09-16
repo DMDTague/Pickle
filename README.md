@@ -119,6 +119,10 @@ Pickle/
 └── web/                playable React interface
 ```
 
+## Contributing
+
+Focused contributions are welcome, especially around perft/regression testing, search correctness, engine benchmarking, UCI behavior, and the browser build. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contribution workflow and suggested areas to work on.
+
 ## A note on engine code
 
 Pickle is not Stockfish with a different name. It does not bundle Stockfish code, weights, or an NNUE network. It uses established chess-engine techniques, but the implementation and evaluation in this repository are built around Pickle's own codebase.
