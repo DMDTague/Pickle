@@ -54,6 +54,12 @@ jobs:
           grep -q 'readyok' /tmp/pickle.log
           grep -Eq '^bestmove [a-h][1-8][a-h][1-8][qrbn]?$' /tmp/pickle.log
 
+      - name: Regression-test timed depth 11 search
+        run: |
+          printf 'position startpos moves e2e4 b8c6 d2d4 g8f6 e4e5 h7h5\ngo depth 11 movetime 3000\nquit\n' \
+            | timeout 8s ./build/pickle | tee /tmp/pickle-depth11.log
+          grep -Eq '^bestmove [a-h][1-8][a-h][1-8][qrbn]?$' /tmp/pickle-depth11.log
+
       - name: Set up Emscripten
         uses: emscripten-core/setup-emsdk@v16
         with:
