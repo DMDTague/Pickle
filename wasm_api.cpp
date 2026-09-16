@@ -2,6 +2,7 @@
 #include "board.h"
 #include "evaluate.h"
 #include "magics.h"
+#include "opening_book.h"
 #include "search.h"
 #include "time_manager.h"
 #include "tt.h"
@@ -28,6 +29,7 @@ void ensure_initialized() {
     init_sliders();
     init_mvv_lva();
     init_zobrist();
+    init_opening_book();
     init_tt(16);
     initialized = true;
 }
@@ -75,6 +77,10 @@ PICKLE_EXPORT int pickle_last_depth() {
 PICKLE_EXPORT int pickle_last_nodes() {
     constexpr U64 JS_SAFE_NODE_CAP = 2147483647ULL;
     return static_cast<int>(std::min(nodes_searched, JS_SAFE_NODE_CAP));
+}
+
+PICKLE_EXPORT int pickle_last_source() {
+    return last_search_source;
 }
 
 } // extern "C"
