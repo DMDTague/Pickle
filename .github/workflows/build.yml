@@ -2,7 +2,7 @@ name: Build Pickle
 
 on:
   push:
-    branches: [main, feature/opening-book-syzygy]
+    branches: [main]
     paths:
       - '*.cpp'
       - '*.h'
