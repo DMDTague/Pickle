@@ -24,6 +24,10 @@ extern int history_moves[12][64];
 void init_mvv_lva();
 void clear_heuristics();
 
+// Returns a legal mate-in-one move, preferring the strongest promotion when
+// several immediate mates exist. Returns 0 when there is no mate in one.
+Move find_immediate_mate(Board& board);
+
 // Tactical leaf search. In-check nodes search legal evasions instead of using
 // stand-pat, which is essential for tactical correctness.
 int quiescence(int alpha, int beta, Board& board, int search_ply = 0, int qs_ply = 0);
