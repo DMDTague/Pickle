@@ -86,6 +86,7 @@ function MoveList({ moves }) {
 export default function App() {
   const gameRef = useRef(new Chess());
   const workerRef = useRef(null);
+  const searchTimerRef = useRef(null);
   const requestSeqRef = useRef(0);
   const activeRequestRef = useRef(0);
   const pendingFenRef = useRef('');
@@ -100,6 +101,7 @@ export default function App() {
   const [thinking, setThinking] = useState(false);
   const [whiteEval, setWhiteEval] = useState(0);
   const [searchInfo, setSearchInfo] = useState({ depth: 0, nodes: 0 });
+  const [workerEpoch, setWorkerEpoch] = useState(0);
 
   const level = LEVELS.find((item) => item.id === levelId) || LEVELS[2];
   const game = gameRef.current;
@@ -107,6 +109,13 @@ export default function App() {
   const verboseHistory = game.history({ verbose: true });
   const lastMove = verboseHistory[verboseHistory.length - 1];
   const status = getStatus(game, thinking, engineReady, engineError);
+
+  function clearSearchWatchdog() {
+    if (searchTimerRef.current !== null) {
+      window.clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+  }
 
   function syncPosition() {
     setFen(gameRef.current.fen());
@@ -127,8 +136,18 @@ export default function App() {
     }
   }
 
+  function restartWorker() {
+    clearSearchWatchdog();
+    workerRef.current?.terminate();
+    workerRef.current = null;
+    setThinking(false);
+    setEngineReady(false);
+    setEngineError('');
+    setWorkerEpoch((value) => value + 1);
+  }
+
   useEffect(() => {
-    const worker = new Worker('/pickle-worker.js');
+    const worker = new Worker(`/pickle-worker.js?v=${workerEpoch}`);
     workerRef.current = worker;
 
     worker.onmessage = (event) => {
@@ -140,14 +159,20 @@ export default function App() {
       }
       if (message.type === 'error') {
         if (!message.requestId || message.requestId === activeRequestRef.current) {
-          setEngineError(message.message || 'Pickle failed to load.');
+          clearSearchWatchdog();
           setThinking(false);
+          if (message.recoverable) {
+            window.setTimeout(restartWorker, 100);
+          } else {
+            setEngineError(message.message || 'Pickle failed to load.');
+          }
         }
         return;
       }
       if (message.type !== 'result' || message.requestId !== activeRequestRef.current) return;
       if (message.fen !== pendingFenRef.current || gameRef.current.fen() !== message.fen) return;
 
+      clearSearchWatchdog();
       const rootColor = pendingEngineColorRef.current;
       const scoreFromWhite = rootColor === 'w' ? message.score : -message.score;
       setWhiteEval(scoreFromWhite);
@@ -159,9 +184,16 @@ export default function App() {
       }
     };
 
+    worker.onerror = () => {
+      window.setTimeout(restartWorker, 100);
+    };
+
     worker.postMessage({ type: 'init' });
-    return () => worker.terminate();
-  }, []);
+    return () => {
+      worker.terminate();
+      if (workerRef.current === worker) workerRef.current = null;
+    };
+  }, [workerEpoch]);
 
   useEffect(() => {
     const current = gameRef.current;
@@ -181,7 +213,18 @@ export default function App() {
       depth: level.depth,
       movetime: level.movetime,
     });
+
+    clearSearchWatchdog();
+    const searchFen = current.fen();
+    const hardLimit = Math.max(6000, level.movetime * 3);
+    searchTimerRef.current = window.setTimeout(() => {
+      if (activeRequestRef.current !== requestId) return;
+      if (gameRef.current.fen() !== searchFen) return;
+      restartWorker();
+    }, hardLimit);
   }, [fen, humanColor, engineReady, engineError, thinking, level.depth, level.movetime]);
+
+  useEffect(() => () => clearSearchWatchdog(), []);
 
   function onPieceDrop({ sourceSquare, targetSquare }) {
     if (!targetSquare || thinking || gameRef.current.isGameOver()) return false;
@@ -202,6 +245,7 @@ export default function App() {
   }
 
   function startNewGame(color = humanColor) {
+    clearSearchWatchdog();
     ++requestSeqRef.current;
     activeRequestRef.current = requestSeqRef.current;
     pendingFenRef.current = '';
