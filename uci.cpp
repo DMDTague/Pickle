@@ -1,5 +1,6 @@
 #include "uci.h"
 #include "movegen.h"
+#include "opening_book.h"
 #include "search.h"
 #include "time_manager.h"
 #include "tt.h"
@@ -59,6 +60,7 @@ void uci_loop(Board& board) {
             std::cout << "id author Dylan Tague\n";
             std::cout << "option name Hash type spin default 32 min 1 max 512\n";
             std::cout << "option name Clear Hash type button\n";
+            std::cout << "option name OwnBook type check default true\n";
             std::cout << "uciok\n" << std::flush;
         }
         else if (command == "isready") {
@@ -79,6 +81,13 @@ void uci_loop(Board& board) {
                 iss >> token; // value
                 if (token == "value") iss >> mb;
                 init_tt(std::clamp(mb, 1, 512));
+            } else if (name == "OwnBook") {
+                std::string value = "true";
+                iss >> token; // value
+                if (token == "value") iss >> value;
+                std::transform(value.begin(), value.end(), value.begin(),
+                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                set_opening_book_enabled(value != "false" && value != "0" && value != "off");
             }
         }
         else if (command == "ucinewgame") {
