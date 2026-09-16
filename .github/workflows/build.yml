@@ -2,7 +2,7 @@ name: Build Pickle
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/opening-book-syzygy]
     paths:
       - '*.cpp'
       - '*.h'
@@ -65,12 +65,16 @@ jobs:
       - name: Verify make/unmake hash invariant
         run: ./build/pickle_regression
 
-      - name: Verify opening book at start position
+      - name: Verify opening book positions
         run: |
           printf 'uci\nisready\nposition startpos\ngo depth 3\nquit\n' | ./build/pickle | tee /tmp/pickle-book.log
           grep -q 'option name OwnBook type check default true' /tmp/pickle-book.log
           grep -q 'info string opening book' /tmp/pickle-book.log
           grep -Eq '^bestmove [a-h][1-8][a-h][1-8][qrbn]?$' /tmp/pickle-book.log
+
+          printf 'position startpos moves e2e4\ngo depth 3\nquit\n' | ./build/pickle | tee /tmp/pickle-book-e4.log
+          grep -q 'info string opening book' /tmp/pickle-book-e4.log
+          grep -Eq '^bestmove [a-h][1-8][a-h][1-8][qrbn]?$' /tmp/pickle-book-e4.log
 
       - name: Smoke-test UCI search without book
         run: |
