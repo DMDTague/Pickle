@@ -27,7 +27,7 @@ if(EMSCRIPTEN)
         -O3
         "-sALLOW_MEMORY_GROWTH=1"
         "-sINITIAL_MEMORY=67108864"
-        "-sENVIRONMENT=web"
+        "-sENVIRONMENT=web,worker"
         "-sMODULARIZE=1"
         "-sEXPORT_NAME=createPickleModule"
         "-sFILESYSTEM=0"
