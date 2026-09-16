@@ -8,6 +8,7 @@
 #include "uci.h"
 #include "zobrist.h"
 #include <algorithm>
+#include <memory>
 #include <string>
 
 #ifdef __EMSCRIPTEN__
@@ -30,6 +31,12 @@ void ensure_initialized() {
     init_tt(16);
     initialized = true;
 }
+
+std::unique_ptr<Board> board_from_fen(const char* fen) {
+    auto board = std::make_unique<Board>();
+    board->parse_fen(fen ? std::string(fen) : std::string());
+    return board;
+}
 } // namespace
 
 extern "C" {
@@ -40,22 +47,21 @@ PICKLE_EXPORT void pickle_init() {
 
 PICKLE_EXPORT const char* pickle_best_move(const char* fen, int depth, int movetime_ms) {
     ensure_initialized();
-    Board board;
-    board.parse_fen(fen ? std::string(fen) : std::string());
+    auto board = board_from_fen(fen);
 
-    depth = std::clamp(depth, 1, 32);
+    depth = std::clamp(depth, 1, 16);
+    movetime_ms = std::clamp(movetime_ms, 50, 5000);
     set_time_limits(-1, 0, movetime_ms, depth);
 
-    Move move = search_best_move(board, depth, false);
+    Move move = search_best_move(*board, depth, false);
     last_move_string = move_to_string(move);
     return last_move_string.c_str();
 }
 
 PICKLE_EXPORT int pickle_eval(const char* fen) {
     ensure_initialized();
-    Board board;
-    board.parse_fen(fen ? std::string(fen) : std::string());
-    return evaluate(board);
+    auto board = board_from_fen(fen);
+    return evaluate(*board);
 }
 
 PICKLE_EXPORT int pickle_last_score() {
