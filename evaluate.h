@@ -3,19 +3,16 @@
 
 #include "board.h"
 
-// -----------------------------------------------------------------------------
-// Material Values
-// -----------------------------------------------------------------------------
-// Base values for the pieces (in centipawns: 100 = 1 pawn)
-const int MATERIAL_PAWN   = 100;
-const int MATERIAL_KNIGHT = 320;
-const int MATERIAL_BISHOP = 330;
-const int MATERIAL_ROOK   = 500;
-const int MATERIAL_QUEEN  = 900;
-const int MATERIAL_KING   = 20000;
+// Centipawn material values. Pickle's personality now comes from positional
+// pressure and initiative rather than changing a piece's value based on turn.
+constexpr int MATERIAL_PAWN   = 100;
+constexpr int MATERIAL_KNIGHT = 320;
+constexpr int MATERIAL_BISHOP = 335;
+constexpr int MATERIAL_ROOK   = 500;
+constexpr int MATERIAL_QUEEN  = 950;
+constexpr int MATERIAL_KING   = 20000;
 
-// Array for quick lookup by PieceType index
-const int MATERIAL_VALUES[6] = {
+constexpr int MATERIAL_VALUES[6] = {
     MATERIAL_PAWN,
     MATERIAL_KNIGHT,
     MATERIAL_BISHOP,
@@ -24,22 +21,11 @@ const int MATERIAL_VALUES[6] = {
     MATERIAL_KING
 };
 
-// -----------------------------------------------------------------------------
-// Nightmare Evaluation Parameters
-// -----------------------------------------------------------------------------
-const int CONTEMPT_FACTOR       = 150; // Points lost for drawing
-const int KING_HUNT_BONUS       = 50;  // Points for attacking King Zone
-const int MOBILITY_WEIGHT       = 5;   // Points per square of mobility
-const int INITIATIVE_BONUS      = 20;  // Points for creating major threats
-const int ASYMMETRY_BONUS       = 30;  // Points for material imbalance
-const int PAWN_STORM_BONUS      = 100; // Points for blowing up pawn shields
-const int OWN_PIECE_DEVAL_PCT   = 90;  // Devalue own pieces to encourage sacrifice
+// Search uses a small draw preference instead of the old 1.5-pawn contempt.
+// A huge contempt value made objectively equal positions look tactically lost.
+constexpr int CONTEMPT_FACTOR = 12;
 
-// -----------------------------------------------------------------------------
-// Evaluation Function
-// -----------------------------------------------------------------------------
-// Evaluates the static score of the board.
-// Returns a positive score if the side to move is winning, negative if losing.
+// Static evaluation from the side-to-move perspective.
 int evaluate(const Board& board);
 
 #endif // EVALUATE_H
