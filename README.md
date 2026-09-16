@@ -19,10 +19,10 @@ Pickle currently includes:
 - aspiration windows
 - null-move pruning
 - adaptive late-move reductions
-- check extensions
 - killer moves and history ordering
 - check-aware quiescence search
-- shallow futility and reverse-futility pruning
+- mate-distance-aware scoring and transposition-table handling
+- exact mate-in-one selection before normal search
 - UCI support and configurable hash size
 - clock-aware search limits
 
@@ -49,6 +49,9 @@ The UI includes:
 - live engine evaluation
 - search depth and node count
 - move history
+- drag-and-drop or click-to-move controls
+- legal-move destination highlights and capture rings
+- last-move and check highlighting
 - undo and board flip controls
 - responsive desktop/mobile layout
 
@@ -102,7 +105,7 @@ For a production build:
 npm run build
 ```
 
-The repository includes a root `vercel.json`, so the web app can be deployed from the repository root once the generated WebAssembly files are present.
+The repository includes a root `vercel.json`. The production Vercel project is linked to this repository and deploys from `main`, so new pushes to `main` trigger the production deployment pipeline.
 
 ## Project layout
 
