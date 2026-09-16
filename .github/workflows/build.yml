@@ -7,6 +7,7 @@ on:
       - '*.cpp'
       - '*.h'
       - 'CMakeLists.txt'
+      - 'tests/**'
       - 'scripts/**'
       - 'web/src/**'
       - 'web/public/pickle-worker.js'
@@ -20,6 +21,7 @@ on:
       - '*.cpp'
       - '*.h'
       - 'CMakeLists.txt'
+      - 'tests/**'
       - 'scripts/**'
       - 'web/src/**'
       - 'web/public/pickle-worker.js'
@@ -42,10 +44,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Apply engine correctness fix
+        run: python3 scripts/apply_engine_correctness_fix.py
+
       - name: Build native Pickle
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel 2
+
+      - name: Verify make/unmake hash invariant
+        run: ./build/pickle_regression
 
       - name: Smoke-test UCI search
         run: |
@@ -53,6 +61,18 @@ jobs:
           grep -q 'uciok' /tmp/pickle.log
           grep -q 'readyok' /tmp/pickle.log
           grep -Eq '^bestmove [a-h][1-8][a-h][1-8][qrbn]?$' /tmp/pickle.log
+
+      - name: Regression-test exact promotion mates from Dylan game
+        run: |
+          printf 'position fen 8/8/8/6k1/7p/8/3nrp2/7K b - - 0 1\ngo depth 3\nquit\n' \
+            | ./build/pickle | tee /tmp/pickle-mate-f.log
+          grep -Eq '^bestmove f2f1[qr]$' /tmp/pickle-mate-f.log
+          grep -q 'score mate 1' /tmp/pickle-mate-f.log
+
+          printf 'position fen b7/8/8/6k1/8/8/r6p/1n3K2 b - - 0 1\ngo depth 3\nquit\n' \
+            | ./build/pickle | tee /tmp/pickle-mate-h.log
+          grep -Eq '^bestmove h2h1[qr]$' /tmp/pickle-mate-h.log
+          grep -q 'score mate 1' /tmp/pickle-mate-h.log
 
       - name: Regression-test timed depth 11 search
         run: |
@@ -79,15 +99,16 @@ jobs:
           npm install
           npm run build
 
-      - name: Commit generated browser engine
+      - name: Commit correctness fix and generated browser engine
         if: github.event_name == 'push'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add web/public/engine/pickle.js web/public/engine/pickle_web.wasm
+          git add board.cpp search.cpp CMakeLists.txt tests/hash_roundtrip.cpp web/public/engine/pickle.js web/public/engine/pickle_web.wasm
           if git diff --cached --quiet; then
-            echo 'Generated WebAssembly is already current.'
+            echo 'Source and generated WebAssembly are already current.'
           else
-            git commit -m 'Build Pickle WebAssembly [skip ci]'
+            git commit -m 'Fix mate search and board hash restoration [skip ci]'
+            git pull --rebase
             git push
           fi
