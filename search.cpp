@@ -3,6 +3,7 @@
 #include "attacks.h"
 #include "movegen.h"
 #include "bit_utils.h"
+#include "opening_book.h"
 #include "uci.h"
 #include "time_manager.h"
 #include "tt.h"
@@ -85,6 +86,7 @@ Move best_move = 0;
 Move previous_best_move = 0;
 int last_search_score = 0;
 int last_search_depth = 0;
+int last_search_source = SEARCH_SOURCE_SEARCH;
 
 Move killer_moves[2][MAX_PLY];
 int history_moves[12][64];
@@ -320,6 +322,7 @@ Move search_best_move(Board& board, int depth, bool print_info) {
     previous_best_move = 0;
     last_search_score = 0;
     last_search_depth = 0;
+    last_search_source = SEARCH_SOURCE_SEARCH;
     clear_heuristics();
 
     Move mate_in_one = find_mate_in_one(board);
@@ -328,12 +331,28 @@ Move search_best_move(Board& board, int depth, bool print_info) {
         previous_best_move = mate_in_one;
         last_search_score = MATE_SCORE - 1;
         last_search_depth = 1;
+        last_search_source = SEARCH_SOURCE_MATE;
         if (print_info) {
             std::cout << "info depth 1 nodes " << nodes_searched
                       << " time 0 nps 0 score mate 1 pv "
                       << move_to_string(mate_in_one) << std::endl;
         }
         return mate_in_one;
+    }
+
+    Move book_move = probe_opening_book(board);
+    if (book_move) {
+        best_move = book_move;
+        previous_best_move = book_move;
+        last_search_score = 0;
+        last_search_depth = 0;
+        last_search_source = SEARCH_SOURCE_BOOK;
+        if (print_info) {
+            std::cout << "info string opening book" << std::endl;
+            std::cout << "info depth 0 nodes 0 time 0 nps 0 pv "
+                      << move_to_string(book_move) << std::endl;
+        }
+        return book_move;
     }
 
     int target_depth = tm.depth_limit > 0 ? tm.depth_limit : depth;
