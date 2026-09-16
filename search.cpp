@@ -15,6 +15,7 @@ namespace {
 constexpr int INF = 50000;
 constexpr int MATE_SCORE = 49000;
 constexpr int MAX_QS_PLY = 32;
+constexpr int MAX_SEARCH_PLY = 128;
 
 bool in_check(const Board& board) {
     Color us = board.get_side_to_move();
@@ -97,7 +98,7 @@ int score_move(Board& board, Move move, Move tt_move, int search_ply) {
 }
 
 int quiescence(int alpha, int beta, Board& board, int qs_ply) {
-    if ((nodes_searched & 2047ULL) == 0) check_time();
+    if ((nodes_searched & 511ULL) == 0) check_time();
     if (tm.time_is_up) return 0;
     ++nodes_searched;
 
@@ -106,8 +107,6 @@ int quiescence(int alpha, int beta, Board& board, int qs_ply) {
     bool checked = in_check(board);
     int stand_pat = evaluate(board);
 
-    // Standing pat while in check is illegal: in that case every legal evasion
-    // must be searched. This fixes a major tactical horizon bug in old Pickle.
     if (!checked) {
         if (stand_pat >= beta) return beta;
         if (stand_pat > alpha) alpha = stand_pat;
@@ -134,12 +133,6 @@ int quiescence(int alpha, int beta, Board& board, int qs_ply) {
         bool tactical = get_move_capture(move) || get_move_promoted(move);
         if (!checked && !tactical) continue;
 
-        // Conservative delta pruning for obviously irrelevant captures.
-        if (!checked && get_move_capture(move) && !get_move_promoted(move)) {
-            int victim = get_move_captured_piece(move);
-            if (stand_pat + MATERIAL_VALUES[victim] + 180 < alpha) continue;
-        }
-
         if (!board.make_move(move)) continue;
         ++legal;
         int score = -quiescence(-beta, -alpha, board, qs_ply + 1);
@@ -155,11 +148,11 @@ int quiescence(int alpha, int beta, Board& board, int qs_ply) {
 }
 
 int negamax(int depth, int alpha, int beta, Board& board, int search_ply, bool can_null_move) {
-    if ((nodes_searched & 2047ULL) == 0) check_time();
+    if ((nodes_searched & 511ULL) == 0) check_time();
     if (tm.time_is_up) return 0;
     ++nodes_searched;
 
-    if (search_ply >= MAX_PLY - 1) return evaluate(board);
+    if (search_ply >= MAX_SEARCH_PLY) return evaluate(board);
     if (search_ply > 0 && board.is_draw()) return -CONTEMPT_FACTOR;
 
     bool checked = in_check(board);
@@ -177,19 +170,12 @@ int negamax(int depth, int alpha, int beta, Board& board, int search_ply, bool c
 
     int static_eval = evaluate(board);
 
-    // Reverse futility at shallow non-PV nodes: if the static position already
-    // clears beta by a safe margin, spend the nodes somewhere more useful.
-    if (!pv_node && !checked && depth <= 3 && board.has_non_pawn_material(board.get_side_to_move())) {
-        int margin = 90 * depth;
-        if (static_eval - margin >= beta && std::abs(beta) < 47000) return static_eval;
-    }
-
-    // Dynamic null-move pruning. Requiring static_eval >= beta and non-pawn
-    // material avoids most zugzwang disasters while cutting a lot of dead wood.
-    if (!pv_node && can_null_move && !checked && depth >= 3
+    // Keep null-move conservative. It is useful, but this engine is still
+    // hand-tuned and should prefer tactical correctness over maximum pruning.
+    if (!pv_node && can_null_move && !checked && depth >= 4
         && static_eval >= beta && board.has_non_pawn_material(board.get_side_to_move())) {
-        int reduction = 2 + depth / 4;
-        reduction = std::min(reduction, 4);
+        int reduction = 2 + depth / 5;
+        reduction = std::min(reduction, 3);
         board.make_null_move();
         int score = -negamax(depth - 1 - reduction, -beta, -beta + 1,
                              board, search_ply + 1, false);
@@ -223,32 +209,26 @@ int negamax(int depth, int alpha, int beta, Board& board, int search_ply, bool c
         if (!board.make_move(move)) continue;
         ++legal_moves;
 
-        bool gives_check = in_check(board); // side-to-move is now the opponent
-        int extension = gives_check ? 1 : 0;
-        int full_depth = depth - 1 + extension;
+        bool gives_check = in_check(board);
 
-        // Shallow futility: only skip late quiet moves after proving they do not
-        // give check. Tactical moves and the first legal move are never skipped.
-        if (quiet && !gives_check && !checked && !pv_node && legal_moves > 1 && depth <= 2
-            && static_eval + (110 * depth) <= alpha) {
-            board.unmake_move(move);
-            continue;
-        }
+        // Old Pickle extended every checking move by a full ply. A chain of
+        // checks could therefore keep depth from decreasing and explode the
+        // browser search tree. Checks are already handled tactically by the
+        // check-aware quiescence search, so normal search depth now always
+        // decreases by one ply.
+        int full_depth = depth - 1;
 
         int score;
         if (legal_moves == 1) {
             score = -negamax(full_depth, -beta, -alpha, board, search_ply + 1, true);
         } else {
             int reduction = 0;
-            if (quiet && !checked && !gives_check && depth >= 3 && legal_moves >= 4) {
+            if (quiet && !checked && !gives_check && depth >= 4 && legal_moves >= 5) {
                 reduction = 1;
-                if (depth >= 6 && legal_moves >= 8) ++reduction;
-                if (depth >= 9 && legal_moves >= 14) ++reduction;
-                reduction = std::min(reduction, std::max(0, full_depth - 1));
+                if (depth >= 7 && legal_moves >= 10) ++reduction;
+                reduction = std::min(reduction, std::min(2, std::max(0, full_depth - 1)));
             }
 
-            // PVS: test later moves with a narrow window. Reduced quiet moves
-            // earn their full depth back when they surprise the current alpha.
             score = -negamax(full_depth - reduction, -alpha - 1, -alpha,
                              board, search_ply + 1, true);
 
@@ -376,8 +356,6 @@ Move search_best_move(Board& board, int depth, bool print_info) {
             std::cout << std::endl;
         }
 
-        // Soft time control reacts to volatility and best-move stability without
-        // permanently inflating the global budget every iteration.
         if (tm.optimum_time != -1) {
             long long soft_limit = tm.optimum_time;
             if (have_previous_score && std::abs(score - previous_score) >= 65) {
