@@ -1,6 +1,6 @@
 let modulePromise = null;
 
-const ENGINE_COMMIT = 'b75b2b8774757c12567e5db01efb402875a76c9b';
+const ENGINE_COMMIT = 'ca68999ab716665f477b9fecb529b632e50a4f2c';
 const ENGINE_CDN = `https://cdn.jsdelivr.net/gh/DMDTague/Pickle@${ENGINE_COMMIT}/web/public/engine`;
 const TABLEBASE_ENDPOINT = 'https://tablebase.lichess.ovh/standard';
 const TABLEBASE_ATTEMPTS = 3;
@@ -161,8 +161,6 @@ async function runSearch(message) {
       [message.fen],
     );
   } catch {
-    // The pinned emergency CDN fallback may predate this export. In that rare
-    // degraded path we continue to tablebase/search instead of killing play.
     immediateMate = '0000';
   }
 
@@ -210,7 +208,6 @@ async function runSearch(message) {
   try {
     sourceCode = engine.ccall('pickle_last_source', 'number', [], []);
   } catch {
-    // Older CDN fallbacks predate source reporting. Treat them as search.
     sourceCode = 0;
   }
 
@@ -257,8 +254,6 @@ self.onmessage = async (event) => {
   try {
     self.postMessage(await runSearch(message));
   } catch (firstError) {
-    // A fresh module is cheap compared with leaving the page permanently dead.
-    // Retry once against the pinned known-good browser engine build.
     try {
       resetEngine({ preferCdn: true });
       self.postMessage(await runSearch(message));
