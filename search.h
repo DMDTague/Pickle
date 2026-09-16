@@ -19,7 +19,7 @@ void clear_heuristics();
 
 // Tactical leaf search. In-check nodes search legal evasions instead of using
 // stand-pat, which is essential for tactical correctness.
-int quiescence(int alpha, int beta, Board& board, int qs_ply = 0);
+int quiescence(int alpha, int beta, Board& board, int search_ply = 0, int qs_ply = 0);
 
 // Principal-variation negamax with alpha-beta, TT, null move, LMR, killers,
 // history ordering, check extensions, and conservative shallow pruning.
