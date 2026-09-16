@@ -4,6 +4,22 @@
 
 std::vector<TTEntry> TT;
 
+namespace {
+constexpr int MATE_TT_THRESHOLD = 48000;
+
+int score_to_tt(int score, int search_ply) {
+    if (score > MATE_TT_THRESHOLD) return score + search_ply;
+    if (score < -MATE_TT_THRESHOLD) return score - search_ply;
+    return score;
+}
+
+int score_from_tt(int score, int search_ply) {
+    if (score > MATE_TT_THRESHOLD) return score - search_ply;
+    if (score < -MATE_TT_THRESHOLD) return score + search_ply;
+    return score;
+}
+} // namespace
+
 void clear_tt() {
     for (auto& entry : TT) {
         entry.key = 0;
@@ -22,7 +38,7 @@ void init_tt(int size_mb) {
     clear_tt();
 }
 
-int probe_tt(U64 hash, int depth, int alpha, int beta, Move& tt_move) {
+int probe_tt(U64 hash, int depth, int alpha, int beta, Move& tt_move, int search_ply) {
     if (TT.empty()) return TT_UNKNOWN;
 
     TTEntry& entry = TT[hash % TT.size()];
@@ -31,13 +47,14 @@ int probe_tt(U64 hash, int depth, int alpha, int beta, Move& tt_move) {
     tt_move = entry.best_move;
     if (entry.depth < depth) return TT_UNKNOWN;
 
-    if (entry.flag == TT_EXACT) return entry.score;
-    if (entry.flag == TT_ALPHA && entry.score <= alpha) return alpha;
-    if (entry.flag == TT_BETA && entry.score >= beta) return beta;
+    int score = score_from_tt(entry.score, search_ply);
+    if (entry.flag == TT_EXACT) return score;
+    if (entry.flag == TT_ALPHA && score <= alpha) return alpha;
+    if (entry.flag == TT_BETA && score >= beta) return beta;
     return TT_UNKNOWN;
 }
 
-void record_tt(U64 hash, int depth, int flag, int score, Move best_move) {
+void record_tt(U64 hash, int depth, int flag, int score, Move best_move, int search_ply) {
     if (TT.empty()) return;
 
     TTEntry& entry = TT[hash % TT.size()];
@@ -52,6 +69,6 @@ void record_tt(U64 hash, int depth, int flag, int score, Move best_move) {
     entry.key = hash;
     entry.depth = depth;
     entry.flag = flag;
-    entry.score = score;
+    entry.score = score_to_tt(score, search_ply);
     entry.best_move = best_move;
 }
