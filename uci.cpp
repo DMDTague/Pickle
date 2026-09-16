@@ -5,6 +5,7 @@
 #include "time_manager.h"
 #include "tt.h"
 #include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <sstream>
 #include <vector>
