@@ -1,9 +1,17 @@
-# Compiled Object files
+# Compiled object / executable files
 *.o
 *.exe
 *.out
 *.app
 pickle
+
+# Native and WebAssembly build trees
+build/
+build-wasm/
+
+# Web app local output
+web/node_modules/
+web/dist/
 
 # IDE and OS files
 .vscode/
