@@ -10,6 +10,7 @@ const LEVELS = [
 ];
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+const EMPTY_SEARCH_INFO = { depth: 0, nodes: 0, source: '', detail: '', tablebaseMoves: [] };
 
 function colorName(color) {
   return color === 'w' ? 'White' : 'Black';
@@ -33,16 +34,52 @@ function formatEval(cp) {
   return `${value >= 0 ? '+' : ''}${value.toFixed(1)}`;
 }
 
-function EvalBar({ score }) {
+function pieceCountFromFen(fen) {
+  const placement = String(fen || '').split(' ')[0] || '';
+  let count = 0;
+  for (const char of placement) {
+    if ('prnbqkPRNBQK'.includes(char)) count += 1;
+  }
+  return count;
+}
+
+function humanizeOutcome(outcome) {
+  const labels = {
+    win: 'Win',
+    'syzygy-win': 'Win',
+    'maybe-win': 'Likely win',
+    'cursed-win': 'Cursed win',
+    draw: 'Draw',
+    'blessed-loss': 'Blessed loss',
+    'maybe-loss': 'Likely loss',
+    'syzygy-loss': 'Loss',
+    loss: 'Loss',
+    unknown: 'Unknown',
+  };
+  return labels[outcome] || 'Unknown';
+}
+
+function outcomeClass(outcome) {
+  if (outcome?.includes('win')) return 'win';
+  if (outcome === 'draw') return 'draw';
+  if (outcome?.includes('loss')) return 'loss';
+  return 'unknown';
+}
+
+function EvalBar({ score, tablebase }) {
   const clamped = Math.max(-700, Math.min(700, score));
-  const whitePercent = 50 + (clamped / 700) * 45;
+  const whitePercent = tablebase ? 50 : 50 + (clamped / 700) * 45;
   return (
-    <div className="eval-bar" aria-label={`Evaluation ${formatEval(score)}`}>
+    <div className={`eval-bar ${tablebase ? 'tablebase-mode' : ''}`} aria-label={tablebase ? 'Tablebase position' : `Evaluation ${formatEval(score)}`}>
       <div className="eval-black" />
       <div className="eval-white" style={{ height: `${whitePercent}%` }} />
-      <span className={score >= 0 ? 'eval-label on-white' : 'eval-label on-black'}>
-        {formatEval(score)}
-      </span>
+      {tablebase ? (
+        <span className="eval-tablebase-label">TB</span>
+      ) : (
+        <span className={score >= 0 ? 'eval-label on-white' : 'eval-label on-black'}>
+          {formatEval(score)}
+        </span>
+      )}
     </div>
   );
 }
@@ -85,6 +122,47 @@ function MoveList({ moves }) {
   );
 }
 
+function DecisionPanel({ info }) {
+  if (info.source === 'tablebase') {
+    return (
+      <div className="decision-panel">
+        <div className="decision-tabs">
+          <span className="decision-tab active"><span className="decision-icon">▤</span>Tablebase</span>
+          <span className="decision-meta">Syzygy · Lichess</span>
+        </div>
+        <div className="tablebase-list">
+          {info.tablebaseMoves.map((move, index) => (
+            <div className={`tablebase-row ${index === 0 ? 'best' : ''}`} key={`${move.uci}-${index}`}>
+              <span className="tablebase-move">{move.san || move.uci}</span>
+              <span className={`tablebase-outcome ${outcomeClass(move.outcome)}`}>
+                {humanizeOutcome(move.outcome)}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="decision-footnote">Moves are ordered by the tablebase. No centipawn evaluation is shown.</div>
+      </div>
+    );
+  }
+
+  if (info.source === 'book') {
+    return (
+      <div className="decision-panel book-panel">
+        <div className="decision-tabs">
+          <span className="decision-tab active"><span className="decision-icon">▤</span>Book</span>
+          <span className="decision-meta">Opening</span>
+        </div>
+        <div className="book-source">
+          <strong>Stockfish opening book</strong>
+          <span>8moves_v3 · official-stockfish/books</span>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 function findKingSquare(game, kingColor) {
   for (const file of FILES) {
     for (let rank = 1; rank <= 8; rank += 1) {
@@ -113,7 +191,7 @@ export default function App() {
   const [engineError, setEngineError] = useState('');
   const [thinking, setThinking] = useState(false);
   const [whiteEval, setWhiteEval] = useState(0);
-  const [searchInfo, setSearchInfo] = useState({ depth: 0, nodes: 0 });
+  const [searchInfo, setSearchInfo] = useState(EMPTY_SEARCH_INFO);
   const [workerEpoch, setWorkerEpoch] = useState(0);
   const [selectedSquare, setSelectedSquare] = useState('');
   const [moveOptionStyles, setMoveOptionStyles] = useState({});
@@ -195,9 +273,17 @@ export default function App() {
 
       clearSearchWatchdog();
       const rootColor = pendingEngineColorRef.current;
-      const scoreFromWhite = rootColor === 'w' ? message.score : -message.score;
-      setWhiteEval(scoreFromWhite);
-      setSearchInfo({ depth: message.depth || 0, nodes: message.nodes || 0 });
+      if (Number.isFinite(message.score)) {
+        const scoreFromWhite = rootColor === 'w' ? message.score : -message.score;
+        setWhiteEval(scoreFromWhite);
+      }
+      setSearchInfo({
+        depth: message.depth || 0,
+        nodes: message.nodes || 0,
+        source: message.source || 'search',
+        detail: message.detail || '',
+        tablebaseMoves: Array.isArray(message.tablebaseMoves) ? message.tablebaseMoves : [],
+      });
       setThinking(false);
 
       if (!applyUciMove(message.move) && !gameRef.current.isGameOver()) {
@@ -238,7 +324,8 @@ export default function App() {
 
     clearSearchWatchdog();
     const searchFen = current.fen();
-    const hardLimit = Math.max(6000, level.movetime * 3);
+    const tablebaseEligible = pieceCountFromFen(searchFen) <= 7;
+    const hardLimit = tablebaseEligible ? 30000 : Math.max(6000, level.movetime * 3);
     searchTimerRef.current = window.setTimeout(() => {
       if (activeRequestRef.current !== requestId) return;
       if (gameRef.current.fen() !== searchFen) return;
@@ -346,7 +433,7 @@ export default function App() {
     setHumanColor(color);
     setOrientation(color === 'w' ? 'white' : 'black');
     setWhiteEval(0);
-    setSearchInfo({ depth: 0, nodes: 0 });
+    setSearchInfo(EMPTY_SEARCH_INFO);
     setEngineError('');
     setThinking(false);
     setFen(gameRef.current.fen());
@@ -360,7 +447,7 @@ export default function App() {
       gameRef.current.undo();
     }
     setWhiteEval(0);
-    setSearchInfo({ depth: 0, nodes: 0 });
+    setSearchInfo(EMPTY_SEARCH_INFO);
     syncPosition();
   }
 
@@ -405,6 +492,7 @@ export default function App() {
   const topColor = orientation === 'white' ? 'b' : 'w';
   const bottomColor = orientation === 'white' ? 'w' : 'b';
   const engineColor = humanColor === 'w' ? 'b' : 'w';
+  const tablebaseMode = searchInfo.source === 'tablebase';
 
   return (
     <div className="app-shell">
@@ -433,7 +521,7 @@ export default function App() {
           />
 
           <div className="board-area">
-            <EvalBar score={whiteEval} />
+            <EvalBar score={whiteEval} tablebase={tablebaseMode} />
             <div className="board-wrap">
               <Chessboard options={boardOptions} />
             </div>
@@ -462,11 +550,19 @@ export default function App() {
           <div className="status-card">
             <strong>{status}</strong>
             <span>
-              {searchInfo.depth > 0
-                ? `Last search: depth ${searchInfo.depth} · ${searchInfo.nodes.toLocaleString()} nodes`
-                : 'Pickle runs locally in your browser.'}
+              {searchInfo.source === 'tablebase'
+                ? 'Last move selected from the endgame tablebase.'
+                : searchInfo.source === 'book'
+                  ? 'Last move selected from Pickle’s opening book.'
+                  : searchInfo.source === 'mate'
+                    ? 'Last move was a forced mate in one.'
+                    : searchInfo.depth > 0
+                      ? `Last search: depth ${searchInfo.depth} · ${searchInfo.nodes.toLocaleString()} nodes`
+                      : 'Pickle runs locally in your browser.'}
             </span>
           </div>
+
+          <DecisionPanel info={searchInfo} />
 
           <div className="moves-title">
             <span>Moves</span>
