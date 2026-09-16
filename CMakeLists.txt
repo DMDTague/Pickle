@@ -1,0 +1,40 @@
+cmake_minimum_required(VERSION 3.20)
+project(Pickle LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(PICKLE_CORE
+    attacks.cpp
+    board.cpp
+    evaluate.cpp
+    magics.cpp
+    movegen.cpp
+    search.cpp
+    time_manager.cpp
+    tt.cpp
+    uci.cpp
+    zobrist.cpp
+)
+
+if(EMSCRIPTEN)
+    add_executable(pickle_web ${PICKLE_CORE} wasm_api.cpp)
+    set_target_properties(pickle_web PROPERTIES SUFFIX ".js")
+
+    target_compile_options(pickle_web PRIVATE -O3)
+    target_link_options(pickle_web PRIVATE
+        -O3
+        "-sALLOW_MEMORY_GROWTH=1"
+        "-sINITIAL_MEMORY=67108864"
+        "-sENVIRONMENT=web"
+        "-sMODULARIZE=1"
+        "-sEXPORT_NAME=createPickleModule"
+        "-sFILESYSTEM=0"
+        "-sEXPORTED_FUNCTIONS=['_pickle_init','_pickle_best_move','_pickle_eval','_pickle_last_score','_pickle_last_depth','_pickle_last_nodes','_malloc','_free']"
+        "-sEXPORTED_RUNTIME_METHODS=['ccall']"
+    )
+else()
+    add_executable(pickle ${PICKLE_CORE} datagen.cpp main.cpp)
+    target_compile_options(pickle PRIVATE -O3)
+endif()
