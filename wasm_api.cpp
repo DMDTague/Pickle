@@ -47,6 +47,13 @@ PICKLE_EXPORT void pickle_init() {
     ensure_initialized();
 }
 
+PICKLE_EXPORT const char* pickle_mate_in_one(const char* fen) {
+    ensure_initialized();
+    auto board = board_from_fen(fen);
+    last_move_string = move_to_string(find_immediate_mate(*board));
+    return last_move_string.c_str();
+}
+
 PICKLE_EXPORT const char* pickle_best_move(const char* fen, int depth, int movetime_ms) {
     ensure_initialized();
     auto board = board_from_fen(fen);
