@@ -1,0 +1,87 @@
+name: Build Pickle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '*.cpp'
+      - '*.h'
+      - 'CMakeLists.txt'
+      - 'scripts/**'
+      - 'web/src/**'
+      - 'web/public/pickle-worker.js'
+      - 'web/package.json'
+      - 'web/vite.config.js'
+      - 'web/index.html'
+      - 'vercel.json'
+      - '.github/workflows/build.yml'
+  pull_request:
+    paths:
+      - '*.cpp'
+      - '*.h'
+      - 'CMakeLists.txt'
+      - 'scripts/**'
+      - 'web/src/**'
+      - 'web/public/pickle-worker.js'
+      - 'web/package.json'
+      - 'web/vite.config.js'
+      - 'web/index.html'
+      - 'vercel.json'
+      - '.github/workflows/build.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Build native Pickle
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel 2
+
+      - name: Smoke-test UCI search
+        run: |
+          printf 'uci\nisready\nposition startpos\ngo depth 3\nquit\n' | ./build/pickle | tee /tmp/pickle.log
+          grep -q 'uciok' /tmp/pickle.log
+          grep -q 'readyok' /tmp/pickle.log
+          grep -Eq '^bestmove [a-h][1-8][a-h][1-8][qrbn]?$' /tmp/pickle.log
+
+      - name: Set up Emscripten
+        uses: emscripten-core/setup-emsdk@v16
+        with:
+          version: latest
+
+      - name: Build Pickle WebAssembly
+        run: bash scripts/build_wasm.sh
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Build web UI
+        working-directory: web
+        run: |
+          npm install
+          npm run build
+
+      - name: Commit generated browser engine
+        if: github.event_name == 'push'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add web/public/engine/pickle.js web/public/engine/pickle_web.wasm
+          if git diff --cached --quiet; then
+            echo 'Generated WebAssembly is already current.'
+          else
+            git commit -m 'Build Pickle WebAssembly [skip ci]'
+            git push
+          fi
