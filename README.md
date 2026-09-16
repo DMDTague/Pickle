@@ -23,8 +23,17 @@ Pickle currently includes:
 - check-aware quiescence search
 - mate-distance-aware scoring and transposition-table handling
 - exact mate-in-one selection before normal search
+- built-in opening-book support with a UCI `OwnBook` switch
 - UCI support and configurable hash size
 - clock-aware search limits
+
+### Opening book
+
+Pickle's opening book is generated from `8moves_v3.pgn` in the official [`official-stockfish/books`](https://github.com/official-stockfish/books) repository. That upstream data is released under CC0 1.0.
+
+The generator pins an exact upstream commit and the raw archive digest, parses the PGN into Pickle's own Zobrist-keyed format, merges transpositions, retains weighted candidate moves, and emits `opening_book_data.inc`. The browser therefore does not need to download or parse a PGN at game time.
+
+The opening book is data only. Pickle does not use Stockfish search code, evaluation code, NNUE weights, or engine binaries.
 
 ### How Pickle evaluates a position
 
@@ -46,18 +55,32 @@ The UI includes:
 
 - play as White or Black
 - multiple search-strength presets
-- live engine evaluation
+- live engine evaluation during normal search
 - search depth and node count
 - move history
 - drag-and-drop or click-to-move controls
 - legal-move destination highlights and capture rings
 - last-move and check highlighting
+- opening-book source indication
+- seven-piece-or-fewer endgame tablebase probing
+- a tablebase panel that shows legal moves by win/draw/loss outcome instead of inventing a centipawn evaluation
 - undo and board flip controls
 - responsive desktop/mobile layout
 
-The board uses the MIT-licensed [`react-chessboard`](https://github.com/Clariity/react-chessboard) component as its rendering/interaction foundation. The surrounding interface and Pickle integration are specific to this project; it does not copy Chess.com assets or source code.
+For eligible standard-chess positions with seven pieces or fewer, the browser probes the public Lichess tablebase service before falling back to Pickle's normal search. Each probe gets multiple attempts with timeouts and short backoff; a transient timeout does not mark the service unavailable for the rest of the game. Tablebase results are treated as game-theoretic win/draw/loss information, not as engine evaluations.
+
+The board uses the MIT-licensed [`react-chessboard`](https://github.com/Clariity/react-chessboard) component as its rendering/interaction foundation. The surrounding interface and Pickle integration are specific to this project; it does not copy Chess.com or Lichess assets or source code.
 
 ## Build the native engine
+
+Generate the opening book first:
+
+```bash
+python -m pip install python-chess==1.999
+python scripts/generate_opening_book.py --output opening_book_data.inc
+```
+
+Then build Pickle:
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -76,9 +99,15 @@ position startpos
 go depth 8
 ```
 
+To force normal search instead of using the built-in opening book:
+
+```text
+setoption name OwnBook value false
+```
+
 ## Build the WebAssembly engine
 
-Install the Emscripten SDK, then run:
+Install the Emscripten SDK, generate the opening book, then run:
 
 ```bash
 bash scripts/build_wasm.sh
@@ -111,19 +140,21 @@ The repository includes a root `vercel.json`. The production Vercel project is l
 
 ```text
 Pickle/
-├── board.*             board state, FEN, move execution
-├── movegen.*           move generation
-├── attacks.*           leaper attacks
-├── magics.*            sliding-piece attack tables
-├── evaluate.*          static evaluation
-├── search.*            search and move ordering
-├── tt.*                transposition table
-├── time_manager.*      search time allocation
-├── uci.*               UCI protocol
-├── zobrist.*           position hashing
-├── wasm_api.cpp        browser-facing C++ API
-├── scripts/            build helpers
-└── web/                playable React interface
+├── board.*                 board state, FEN, move execution
+├── movegen.*               move generation
+├── attacks.*               leaper attacks
+├── magics.*                sliding-piece attack tables
+├── evaluate.*              static evaluation
+├── opening_book.*          compiled opening-book lookup
+├── opening_book_data.inc   generated book data
+├── search.*                search and move ordering
+├── tt.*                    transposition table
+├── time_manager.*          search time allocation
+├── uci.*                   UCI protocol
+├── zobrist.*               position hashing
+├── wasm_api.cpp            browser-facing C++ API
+├── scripts/                build/book-generation helpers
+└── web/                    playable React interface
 ```
 
 ## Contributing
@@ -132,4 +163,4 @@ Focused contributions are welcome, especially around perft/regression testing, s
 
 ## A note on engine code
 
-Pickle is not Stockfish with a different name. It does not bundle Stockfish code, weights, or an NNUE network. It uses established chess-engine techniques, but the implementation and evaluation in this repository are built around Pickle's own codebase.
+Pickle is not Stockfish with a different name. It uses established chess-engine techniques and now derives opening-book **data** from the CC0 official Stockfish books repository, but its search, evaluation, move generation, hashing, time management, UCI implementation, and browser engine are Pickle's own codebase.
