@@ -45,9 +45,9 @@ The generated result is compiled into `opening_book_data.inc`, so native and bro
 
 I originally hoped Pickle would play like his namesake: the titular satanic Border Collie from Adult Swim's *Mr. Pickles*, happily killing and mutilating its unfortunate human chess opponents through wildly aggressive play.
 
-Unfortunately, every time I turned the aggression dial too far, Pickle's Elo began falling off a cliff.
-
 At one point I considered making the Colle System a central part of Pickle's repertoire, but decided against it until I was confident I could program the engine to be aggressive enough to make playing the Colle feel morally defensible.
+
+Unfortunately, every time I turned the aggression dial too far, Pickle's Elo began falling off a cliff.
 
 That changed the project somewhat. Watching Pickle's Elo fall off a cliff every time I tried to force more aggression into it made something obvious to me: I did not yet have the fundamental understanding of computer-chess analysis needed to build an engine strong enough to achieve the thing I actually wanted to make. So the project stopped being just a destination and the progress toward that destination became the project itself.
 
