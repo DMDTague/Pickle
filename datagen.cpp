@@ -27,8 +27,8 @@ void run_datagen(int games, int target_depth, const std::string& filename) {
     std::cout << "Starting Data Generation... (" << games << " games at depth " << target_depth << ")\n";
 
     // Disable time management for raw algorithmic depth mapping
-    tm.depth_limit = target_depth;
-    tm.time_is_up = false;
+    search_timer.depth_limit = target_depth;
+    search_timer.time_is_up = false;
 
     for (int g = 0; g < games; g++) {
         Board board;
@@ -101,11 +101,11 @@ void run_datagen(int games, int target_depth, const std::string& filename) {
             Move best = 0;
             clear_heuristics();
             nodes_searched = 0;
-            tm.time_is_up = false;
+            search_timer.time_is_up = false;
 
             for (int d = 1; d <= target_depth; d++) {
                 final_score = negamax(d, -50000, 50000, board, 0, true);
-                if (!tm.time_is_up) best = best_move;
+                if (!search_timer.time_is_up) best = best_move;
             }
             
             // To prevent mating scores distorting NN evaluations heavily, cap mate scores
