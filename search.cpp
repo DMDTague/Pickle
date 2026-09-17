@@ -137,7 +137,7 @@ int score_move(Board& board, Move move, Move tt_move, int search_ply) {
 
 int quiescence(int alpha, int beta, Board& board, int search_ply, int qs_ply) {
     if ((nodes_searched & 511ULL) == 0) check_time();
-    if (tm.time_is_up) return 0;
+    if (search_timer.time_is_up) return 0;
     ++nodes_searched;
 
     if (qs_ply >= MAX_QS_PLY) return evaluate(board);
@@ -176,7 +176,7 @@ int quiescence(int alpha, int beta, Board& board, int search_ply, int qs_ply) {
         int score = -quiescence(-beta, -alpha, board, search_ply + 1, qs_ply + 1);
         board.unmake_move(move);
 
-        if (tm.time_is_up) return 0;
+        if (search_timer.time_is_up) return 0;
         if (score >= beta) return beta;
         if (score > alpha) alpha = score;
     }
@@ -187,7 +187,7 @@ int quiescence(int alpha, int beta, Board& board, int search_ply, int qs_ply) {
 
 int negamax(int depth, int alpha, int beta, Board& board, int search_ply, bool can_null_move) {
     if ((nodes_searched & 511ULL) == 0) check_time();
-    if (tm.time_is_up) return 0;
+    if (search_timer.time_is_up) return 0;
     ++nodes_searched;
 
     if (search_ply >= MAX_SEARCH_PLY) return evaluate(board);
@@ -218,7 +218,7 @@ int negamax(int depth, int alpha, int beta, Board& board, int search_ply, bool c
         int score = -negamax(depth - 1 - reduction, -beta, -beta + 1,
                              board, search_ply + 1, false);
         board.unmake_null_move();
-        if (tm.time_is_up) return 0;
+        if (search_timer.time_is_up) return 0;
         if (score >= beta) return beta;
     }
 
@@ -281,7 +281,7 @@ int negamax(int depth, int alpha, int beta, Board& board, int search_ply, bool c
         }
 
         board.unmake_move(move);
-        if (tm.time_is_up) return 0;
+        if (search_timer.time_is_up) return 0;
 
         if (score >= beta) {
             if (search_ply == 0) best_move = move;
@@ -355,7 +355,7 @@ Move search_best_move(Board& board, int depth, bool print_info) {
         return book_move;
     }
 
-    int target_depth = tm.depth_limit > 0 ? tm.depth_limit : depth;
+    int target_depth = search_timer.depth_limit > 0 ? search_timer.depth_limit : depth;
     if (target_depth <= 0) target_depth = 64;
 
     auto wall_start = std::chrono::high_resolution_clock::now();
@@ -378,7 +378,7 @@ Move search_best_move(Board& board, int depth, bool print_info) {
         while (true) {
             best_move = completed_move;
             score = negamax(current_depth, alpha, beta, board, 0, true);
-            if (tm.time_is_up || tm.stopped) break;
+            if (search_timer.time_is_up || search_timer.stopped) break;
 
             if (score <= alpha && alpha > -INF) {
                 window *= 2;
@@ -395,7 +395,7 @@ Move search_best_move(Board& board, int depth, bool print_info) {
             break;
         }
 
-        if (tm.time_is_up || tm.stopped) break;
+        if (search_timer.time_is_up || search_timer.stopped) break;
 
         Move iteration_move = best_move ? best_move : completed_move;
         if (iteration_move == completed_move && iteration_move != 0) ++stable_best_count;
@@ -426,12 +426,13 @@ Move search_best_move(Board& board, int depth, bool print_info) {
             std::cout << std::endl;
         }
 
-        if (tm.optimum_time != -1) {
-            long long soft_limit = tm.optimum_time;
+        if (search_timer.optimum_time != -1) {
+            long long soft_limit = search_timer.optimum_time;
             if (have_previous_score && std::abs(score - previous_score) >= 65) {
-                soft_limit = std::min(tm.max_time, tm.optimum_time + tm.optimum_time / 2);
+                soft_limit = std::min(search_timer.max_time,
+                                      search_timer.optimum_time + search_timer.optimum_time / 2);
             } else if (stable_best_count >= 3) {
-                soft_limit = std::max(1LL, (tm.optimum_time * 3) / 4);
+                soft_limit = std::max(1LL, (search_timer.optimum_time * 3) / 4);
             }
             if (elapsed >= soft_limit) break;
         }
