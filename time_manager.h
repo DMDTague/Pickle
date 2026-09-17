@@ -1,6 +1,8 @@
 #ifndef TIME_MANAGER_H
 #define TIME_MANAGER_H
 
+#include <chrono>
+
 // Retrieves the current time in milliseconds using the OS clock
 long long get_time_ms();
 
@@ -14,7 +16,9 @@ struct TimeManager {
     bool stopped; // external flag to forcefully stop searching
 };
 
-// Global TimeManger instance
+// Global TimeManager instance. <chrono> is included before this declaration so
+// the C/C++ standard tm type is already established on MSVC before this legacy
+// variable name enters the global namespace.
 extern TimeManager tm;
 
 // Initialize the time manager with specific limits.
