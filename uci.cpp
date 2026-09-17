@@ -149,7 +149,7 @@ void uci_loop(Board& board) {
             search_position(board, depth);
         }
         else if (command == "stop") {
-            tm.stopped = true;
+            search_timer.stopped = true;
         }
         else if (command == "quit") {
             break;
