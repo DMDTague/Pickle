@@ -119,3 +119,25 @@ jobs:
           $output | Write-Host
           if ($output -notcontains 'uciok') { throw 'Missing uciok from Windows build.' }
           if ($output -notcontains 'readyok') { throw 'Missing readyok from Windows build.' }
+      - name: Run FastChess UCI compliance
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $headers = @{
+            'User-Agent' = 'Pickle-Elo-Harness-CI'
+            'Authorization' = "Bearer $env:GITHUB_TOKEN"
+          }
+          $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/Disservin/fastchess/releases/latest' -Headers $headers
+          $asset = @($release.assets) | Where-Object {
+            $_.name -match '(?i)windows' -and
+            $_.name -match '(?i)(x86[-_]?64|x64)' -and
+            $_.name -match '\.zip$'
+          } | Select-Object -First 1
+          if (-not $asset) { throw "No Windows x86-64 FastChess ZIP found in $($release.tag_name)." }
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile fastchess.zip
+          Expand-Archive -Path fastchess.zip -DestinationPath fastchess-ci -Force
+          $fast = Get-ChildItem fastchess-ci -Recurse -File | Where-Object { $_.Name -match '(?i)^fastchess.*\.exe$' } | Select-Object -First 1
+          if (-not $fast) { throw 'FastChess executable not found after extraction.' }
+          & $fast.FullName --compliance .\build-windows\Release\pickle.exe
+          if ($LASTEXITCODE -ne 0) { throw "FastChess compliance failed with exit code $LASTEXITCODE." }
