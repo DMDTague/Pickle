@@ -1,0 +1,80 @@
+name: Validate Elo tournament tools
+
+on:
+  push:
+    branches: [tools/elo-tournament]
+    paths:
+      - 'tournament/**'
+      - '.github/workflows/tournament-tools.yml'
+  pull_request:
+    paths:
+      - 'tournament/**'
+      - '.github/workflows/tournament-tools.yml'
+
+jobs:
+  estimator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Compile estimator
+        run: python -m py_compile tournament/estimate_elo.py
+      - name: Smoke-test Elo fit
+        run: |
+          cat > /tmp/synthetic.pgn <<'PGN'
+          [Event "Synthetic"]
+          [White "Pickle_D11"]
+          [Black "Stockfish_2400"]
+          [Result "1-0"]
+
+          [Event "Synthetic"]
+          [White "Stockfish_2400"]
+          [Black "Pickle_D11"]
+          [Result "0-1"]
+
+          [Event "Synthetic"]
+          [White "Pickle_D11"]
+          [Black "Stockfish_2400"]
+          [Result "0-1"]
+
+          [Event "Synthetic"]
+          [White "Stockfish_2400"]
+          [Black "Pickle_D11"]
+          [Result "1-0"]
+
+          [Event "Synthetic"]
+          [White "Pickle_D11"]
+          [Black "Stockfish_2400"]
+          [Result "1/2-1/2"]
+
+          [Event "Synthetic"]
+          [White "Stockfish_2400"]
+          [Black "Pickle_D11"]
+          [Result "1/2-1/2"]
+
+          [Event "Synthetic"]
+          [White "Pickle_D11"]
+          [Black "Stockfish_2400"]
+          [Result "1/2-1/2"]
+
+          [Event "Synthetic"]
+          [White "Stockfish_2400"]
+          [Black "Pickle_D11"]
+          [Result "1/2-1/2"]
+          PGN
+          python tournament/estimate_elo.py /tmp/synthetic.pgn --bootstrap 300 | tee /tmp/elo.txt
+          grep -q 'Estimated Pickle D11 Elo: 2400' /tmp/elo.txt
+
+  powershell-syntax:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Parse PowerShell launchers
+        shell: pwsh
+        run: |
+          Get-ChildItem tournament -Filter *.ps1 | ForEach-Object {
+            Write-Host "Parsing $($_.Name)"
+            [void][ScriptBlock]::Create((Get-Content $_.FullName -Raw))
+          }
