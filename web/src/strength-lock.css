@@ -1,0 +1,13 @@
+/* Pickle has one browser strength: depth 11. */
+.controls > label:first-child {
+  display: none;
+}
+
+.engine-avatar + .player-copy span {
+  font-size: 0;
+}
+
+.engine-avatar + .player-copy span::after {
+  content: 'Depth 11';
+  font-size: 11px;
+}
