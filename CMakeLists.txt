@@ -20,11 +20,19 @@ set(PICKLE_CORE
     zobrist.cpp
 )
 
+function(pickle_enable_release_optimizations target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /O2)
+    else()
+        target_compile_options(${target} PRIVATE -O3)
+    endif()
+endfunction()
+
 if(EMSCRIPTEN)
     add_executable(pickle_web ${PICKLE_CORE} wasm_api.cpp)
     set_target_properties(pickle_web PROPERTIES SUFFIX ".js")
 
-    target_compile_options(pickle_web PRIVATE -O3)
+    pickle_enable_release_optimizations(pickle_web)
     target_link_options(pickle_web PRIVATE
         -O3
         "-sALLOW_MEMORY_GROWTH=1"
@@ -39,9 +47,9 @@ if(EMSCRIPTEN)
     )
 else()
     add_executable(pickle ${PICKLE_CORE} datagen.cpp main.cpp)
-    target_compile_options(pickle PRIVATE -O3)
+    pickle_enable_release_optimizations(pickle)
 
     add_executable(pickle_regression attacks.cpp board.cpp magics.cpp movegen.cpp zobrist.cpp tests/hash_roundtrip.cpp)
     target_include_directories(pickle_regression PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_compile_options(pickle_regression PRIVATE -O3)
+    pickle_enable_release_optimizations(pickle_regression)
 endif()

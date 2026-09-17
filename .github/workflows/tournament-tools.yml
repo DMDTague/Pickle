@@ -10,6 +10,12 @@ on:
     paths:
       - 'tournament/**'
       - '.github/workflows/tournament-tools.yml'
+      - 'CMakeLists.txt'
+      - 'bit_utils.h'
+      - 'magics.cpp'
+      - 'time_manager.h'
+      - '*.cpp'
+      - '*.h'
 
 jobs:
   estimator:
@@ -78,3 +84,20 @@ jobs:
             Write-Host "Parsing $($_.Name)"
             [void][ScriptBlock]::Create((Get-Content $_.FullName -Raw))
           }
+
+  windows-native-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure Release build
+        run: cmake -S . -B build-windows
+      - name: Build Pickle with MSVC
+        run: cmake --build build-windows --config Release --parallel
+      - name: Smoke-test UCI
+        shell: pwsh
+        run: |
+          $inputText = "uci`nisready`nquit`n"
+          $output = $inputText | & .\build-windows\Release\pickle.exe
+          $output | Write-Host
+          if ($output -notcontains 'uciok') { throw 'Missing uciok from Windows build.' }
+          if ($output -notcontains 'readyok') { throw 'Missing readyok from Windows build.' }

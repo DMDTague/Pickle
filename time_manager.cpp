@@ -1,7 +1,7 @@
 #include <chrono>
 #include "time_manager.h"
 
-TimeManager tm;
+TimeManager search_timer;
 
 long long get_time_ms() {
     auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(
@@ -11,42 +11,42 @@ long long get_time_ms() {
 }
 
 void set_time_limits(long long time_left, long long inc, long long movetime, int depth) {
-    tm.stopped = false;
-    tm.time_is_up = false;
-    tm.start_time = get_time_ms();
-    tm.depth_limit = depth;
+    search_timer.stopped = false;
+    search_timer.time_is_up = false;
+    search_timer.start_time = get_time_ms();
+    search_timer.depth_limit = depth;
 
     if (movetime > 0) {
-        tm.optimum_time = movetime;
-        tm.max_time = movetime;
-        tm.stop_time = tm.start_time + movetime;
+        search_timer.optimum_time = movetime;
+        search_timer.max_time = movetime;
+        search_timer.stop_time = search_timer.start_time + movetime;
     } else if (time_left > 0) {
         // Allocate roughly one move from a 30-move horizon plus part of increment.
-        tm.optimum_time = (time_left / 30) + (inc / 2);
-        tm.max_time = (time_left / 10) + inc;
+        search_timer.optimum_time = (time_left / 30) + (inc / 2);
+        search_timer.max_time = (time_left / 10) + inc;
 
-        if (tm.optimum_time > time_left - 50) tm.optimum_time = time_left - 50;
-        if (tm.max_time > time_left - 50) tm.max_time = time_left - 50;
+        if (search_timer.optimum_time > time_left - 50) search_timer.optimum_time = time_left - 50;
+        if (search_timer.max_time > time_left - 50) search_timer.max_time = time_left - 50;
 
-        if (tm.optimum_time < 0) tm.optimum_time = 0;
-        if (tm.max_time < 0) tm.max_time = 0;
+        if (search_timer.optimum_time < 0) search_timer.optimum_time = 0;
+        if (search_timer.max_time < 0) search_timer.max_time = 0;
 
-        tm.stop_time = tm.start_time + tm.max_time;
+        search_timer.stop_time = search_timer.start_time + search_timer.max_time;
     } else {
-        tm.optimum_time = -1;
-        tm.max_time = -1;
-        tm.stop_time = -1;
+        search_timer.optimum_time = -1;
+        search_timer.max_time = -1;
+        search_timer.stop_time = -1;
     }
 }
 
 void check_time() {
-    if (tm.stopped) {
-        tm.time_is_up = true;
+    if (search_timer.stopped) {
+        search_timer.time_is_up = true;
         return;
     }
 
-    if (tm.stop_time != -1 && get_time_ms() >= tm.stop_time) {
-        tm.time_is_up = true;
-        tm.stopped = true;
+    if (search_timer.stop_time != -1 && get_time_ms() >= search_timer.stop_time) {
+        search_timer.time_is_up = true;
+        search_timer.stopped = true;
     }
 }

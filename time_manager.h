@@ -14,8 +14,9 @@ struct TimeManager {
     bool stopped; // external flag to forcefully stop searching
 };
 
-// Global TimeManger instance
-extern TimeManager tm;
+// Global search timer state. The explicit name avoids colliding with the
+// standard C/C++ `tm` time structure on MSVC.
+extern TimeManager search_timer;
 
 // Initialize the time manager with specific limits.
 // Setting elements to -1 implies "infinite"

@@ -1,4 +1,5 @@
 #include "magics.h"
+#include "bit_utils.h"
 #include <iostream>
 
 // -----------------------------------------------------------------------------
@@ -164,12 +165,12 @@ U64 rook_attacks_on_the_fly(int square, U64 block) {
 // Permutation Generator
 // -----------------------------------------------------------------------------
 
-// Utility to set occupancy for a specific index. 
+// Utility to set occupancy for a specific index.
 // Standard LSB-based permutation generator.
 static U64 set_occupancy(int index, int bits_in_mask, U64 attack_mask) {
     U64 occupancy = 0ULL;
     for (int count = 0; count < bits_in_mask; count++) {
-        int square = __builtin_ctzll(attack_mask);
+        int square = lsb(attack_mask);
         attack_mask &= ~(1ULL << square);
         if (index & (1 << count)) {
             occupancy |= (1ULL << square);
