@@ -107,21 +107,39 @@ $bookFile = Get-ChildItem $bookExtract -Recurse -File | Where-Object { $_.Name -
 if (-not $bookFile) { throw 'Opening suite ZIP did not contain UHO_Lichess_4852_v1.epd.' }
 Copy-Item $bookFile.FullName (Join-Path $BookDir 'UHO_Lichess_4852_v1.epd') -Force
 
+$picklePath = Join-Path $BinDir 'pickle.exe'
+$fastPath = Join-Path $BinDir 'fastchess.exe'
+$sfPath = Join-Path $BinDir 'stockfish.exe'
+$bookPath = Join-Path $BookDir 'UHO_Lichess_4852_v1.epd'
+$pickleCommit = 'unknown (repository was not available through git)'
+if (Get-Command git -ErrorAction SilentlyContinue) {
+    try {
+        $resolvedCommit = (& git -C $RepoRoot rev-parse HEAD 2>$null)
+        if ($LASTEXITCODE -eq 0 -and $resolvedCommit) { $pickleCommit = $resolvedCommit.Trim() }
+    } catch { }
+}
+
 $metadata = @(
-    "Pickle commit: $(git -C $RepoRoot rev-parse HEAD)",
+    "Created UTC: $([DateTime]::UtcNow.ToString('o'))",
+    "CPU: $env:PROCESSOR_IDENTIFIER",
+    "Pickle commit: $pickleCommit",
+    "Pickle SHA256: $((Get-FileHash $picklePath -Algorithm SHA256).Hash)",
     "FastChess release: $($fastRelease.tag_name)",
     "FastChess asset: $($fastAsset.name)",
+    "FastChess SHA256: $((Get-FileHash $fastPath -Algorithm SHA256).Hash)",
     "Stockfish release: $($sfRelease.tag_name)",
     "Stockfish asset: $($sfAsset.name)",
-    "Opening suite: official-stockfish/books@$bookCommit UHO_Lichess_4852_v1.epd"
+    "Stockfish SHA256: $((Get-FileHash $sfPath -Algorithm SHA256).Hash)",
+    "Opening suite: official-stockfish/books@$bookCommit UHO_Lichess_4852_v1.epd",
+    "Opening suite SHA256: $((Get-FileHash $bookPath -Algorithm SHA256).Hash)"
 )
 $metadata | Set-Content -Path (Join-Path $TournamentDir 'environment.txt') -Encoding utf8
 
 Write-Host ''
 Write-Host 'Tournament environment is ready:' -ForegroundColor Green
-Write-Host "  Pickle:    $(Join-Path $BinDir 'pickle.exe')"
-Write-Host "  FastChess: $(Join-Path $BinDir 'fastchess.exe')"
-Write-Host "  Stockfish: $(Join-Path $BinDir 'stockfish.exe')"
-Write-Host "  Openings:  $(Join-Path $BookDir 'UHO_Lichess_4852_v1.epd')"
+Write-Host "  Pickle:    $picklePath"
+Write-Host "  FastChess: $fastPath"
+Write-Host "  Stockfish: $sfPath"
+Write-Host "  Openings:  $bookPath"
 Write-Host ''
 Write-Host 'Next: .\run_compliance.ps1, then .\run_bracket.ps1'
