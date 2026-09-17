@@ -25,6 +25,7 @@ import hashlib
 import json
 import math
 import random
+import sys
 import urllib.request
 from pathlib import Path
 
@@ -252,7 +253,7 @@ def horizon_fit(board: chess.Board, move: chess.Move, ply: int) -> float:
     # Repeated early queen moves are exactly the sort of tempo debt that left
     # Pickle calculating an open Scandinavian from behind in development.
     if piece.piece_type == chess.QUEEN and ply < 12:
-        factor *= 0.30 if undeveloped_before >= 2 else 0.62
+        factor *= 0.18 if undeveloped_before >= 2 else 0.62
         queen_home = chess.D1 if us == chess.WHITE else chess.D8
         if move.from_square != queen_home:
             factor *= 0.42
