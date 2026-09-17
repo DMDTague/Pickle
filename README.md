@@ -49,11 +49,17 @@ Unfortunately, every time I turned the aggression dial too far, Pickle's Elo beg
 
 At one point I considered making the Colle System a central part of Pickle's repertoire, but decided against it until I was confident I could program the engine to be aggressive enough to make playing the Colle feel morally defensible.
 
-That changed the project somewhat. For now, the goal is to increase Pickle's playing strength as far as I reasonably can while keeping the engine recognizably its own. Its evaluation is entirely handcrafted and considers material, piece-square placement, mobility, bishop pair, pawn structure, passed and connected pawns, knight outposts, rook activity, king shelter, open files around the king, endgame king activity, pawn storms, and coordinated pressure on the enemy king.
+That changed the project somewhat. Watching Pickle's Elo fall off a cliff every time I tried to force more aggression into it made something obvious to me: I did not yet have the fundamental understanding of computer-chess analysis needed to build an engine strong enough to achieve the thing I actually wanted to make. So the project stopped being just a destination and the progress toward that destination became the project itself.
+
+For now, the goal is to push Pickle's strength as far as I can independently, without simply looking up the answers and copying the strongest known solutions, until I can develop an engine capable of consistently beating opposition at or above the level of the best human players in the world, with a long-term target around 3000+ on the engine-calibration scale. I want to get there by actually learning why stronger search, evaluation, pruning, move ordering, and positional understanding work rather than treating Stockfish or another open engine as an answer key.
+
+Its evaluation is entirely handcrafted and considers material, piece-square placement, mobility, bishop pair, pawn structure, passed and connected pawns, knight outposts, rook activity, king shelter, open files around the king, endgame king activity, pawn storms, and coordinated pressure on the enemy king.
 
 Once Pickle reaches a strength range I'm satisfied with, I want to investigate the more interesting questions: what does this engine value differently from Stockfish and stronger open-source engines such as Ethereal, Berserk, and Koivisto? Which of those differences are weaknesses, which are merely stylistic, and how much aggression can be deliberately reintroduced before playing strength starts collapsing again?
 
-Then, having done the responsible engineering work first, I can return to the original objective: turn Pickle into Mr. Pickles and reign terror upon those who dare face it.
+I do not expect to work on Pickle on any fixed schedule. I will probably keep returning to it whenever the prospect of creating a satanic Border Collie chess nightmare powered by cold machinery, good mathematics, and increasingly competent computer science becomes too entertaining to ignore.
+
+Eventually, the goal is still the same: make Pickle aggressive and strong enough to make Magnus shake in his boots.
 
 ## Play against Pickle
 
