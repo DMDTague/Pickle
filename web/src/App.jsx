@@ -153,8 +153,8 @@ function DecisionPanel({ info }) {
           <span className="decision-meta">Opening</span>
         </div>
         <div className="book-source">
-          <strong>Stockfish opening book</strong>
-          <span>8moves_v3 · official-stockfish/books</span>
+          <strong>PickleBook</strong>
+          <span>Lichess Elite · horizon-weighted for Pickle</span>
         </div>
       </div>
     );

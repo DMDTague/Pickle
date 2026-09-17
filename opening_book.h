@@ -4,8 +4,8 @@
 #include "board.h"
 #include "move.h"
 
-// Pickle's opening book is generated at build time from pinned
-// official-stockfish/books data and compiled into the engine.
+// PickleBook is generated at build time from a pinned Lichess-Elite-derived
+// repertoire, then reweighted for Pickle's shallow-search horizon.
 void init_opening_book();
 
 // Returns a legal weighted book move for the current position, or 0 when out of book.
