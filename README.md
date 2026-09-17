@@ -27,13 +27,15 @@ Pickle currently includes:
 - UCI support and configurable hash size
 - clock-aware search limits
 
-### Opening book
+### PickleBook
 
-Pickle's opening book is generated from `8moves_v3.pgn` in the official [`official-stockfish/books`](https://github.com/official-stockfish/books) repository. That upstream data is released under CC0 1.0.
+Pickle's opening repertoire is **PickleBook**, a compact book derived from strong non-bullet games in the Lichess Elite Database rather than from a generic engine-testing book. The current seed tree comes from a pinned Lichess-Elite-derived repertoire in PyCheckmate, whose book builder samples up to 80,000 elite games through the first 16 plies. Pickle pins both the upstream repository revision and the exact source blob used for regeneration.
 
-The generator pins an exact upstream commit and the raw archive digest, parses the PGN into Pickle's own Zobrist-keyed format, merges transpositions, retains weighted candidate moves, and emits `opening_book_data.inc`. The browser therefore does not need to download or parse a PGN at game time.
+The upstream human frequencies are only a prior. `scripts/generate_opening_book.py` replays the tree into Pickle's own Zobrist format and reweights each candidate for the limitations of Pickle's shallow browser search. The filter rewards direct development and castling, penalizes repeated early queen moves and exposed kings, penalizes new pawn defects, and downweights positions with unusually high immediate branching or forcing-move density. Low-fit alternatives are removed instead of being kept merely because they are theoretically playable.
 
-The opening book is data only. Pickle does not use Stockfish search code, evaluation code, NNUE weights, or engine binaries.
+This is deliberately different from asking a depth-11 engine to understand why a long-term structural concession may pay off dozens of moves later. The book is intended to hand Pickle positions where the important features are visible inside its horizon. The observed `Qxd5` Scandinavian tempo-loss line is part of the generator's regression audit: the development-first `...Nf6` continuation must outrank the early queen capture before a book can be produced.
+
+The generated result is compiled into `opening_book_data.inc`, so native and browser Pickle have no opening-time network dependency. The source repertoire is data only; Pickle does not run PyCheckmate or another chess engine for book moves.
 
 ### How Pickle evaluates a position
 
@@ -73,7 +75,7 @@ The board uses the MIT-licensed [`react-chessboard`](https://github.com/Clariity
 
 ## Build the native engine
 
-Generate the opening book first:
+Generate PickleBook first:
 
 ```bash
 python -m pip install python-chess==1.999
@@ -107,7 +109,7 @@ setoption name OwnBook value false
 
 ## Build the WebAssembly engine
 
-Install the Emscripten SDK, generate the opening book, then run:
+Install the Emscripten SDK, generate PickleBook, then run:
 
 ```bash
 bash scripts/build_wasm.sh
@@ -145,8 +147,8 @@ Pickle/
 ├── attacks.*               leaper attacks
 ├── magics.*                sliding-piece attack tables
 ├── evaluate.*              static evaluation
-├── opening_book.*          compiled opening-book lookup
-├── opening_book_data.inc   generated book data
+├── opening_book.*          compiled PickleBook lookup
+├── opening_book_data.inc   generated PickleBook data
 ├── search.*                search and move ordering
 ├── tt.*                    transposition table
 ├── time_manager.*          search time allocation
@@ -163,4 +165,4 @@ Focused contributions are welcome, especially around perft/regression testing, s
 
 ## A note on engine code
 
-Pickle is not Stockfish with a different name. It uses established chess-engine techniques and now derives opening-book **data** from the CC0 official Stockfish books repository, but its search, evaluation, move generation, hashing, time management, UCI implementation, and browser engine are Pickle's own codebase.
+Pickle is its own chess engine. It uses established chess-engine techniques and a derived strong-human opening dataset, but its search, evaluation, move generation, hashing, time management, UCI implementation, opening-book policy, and browser engine are Pickle's own codebase.
