@@ -146,6 +146,15 @@ void uci_loop(Board& board) {
             }
 
             set_time_limits(time_left, inc, movetime, depth);
+
+            // FastChess expects the most recent parseable info line before
+            // bestmove to contain a score. A book hit may return immediately,
+            // so publish PickleBook's neutral stored score up front. Normal
+            // searches immediately replace this with their iterative score.
+            if (opening_book_enabled()) {
+                std::cout << "info depth 0 nodes 0 time 0 nps 0 score cp 0\n" << std::flush;
+            }
+
             search_position(board, depth);
         }
         else if (command == "stop") {
