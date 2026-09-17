@@ -1,11 +1,13 @@
 let modulePromise = null;
 
-const ENGINE_COMMIT = 'ca68999ab716665f477b9fecb529b632e50a4f2c';
+const ENGINE_COMMIT = '6072136e07921f787fd5afb0c5cd3779c43d62d9';
 const ENGINE_CDN = `https://cdn.jsdelivr.net/gh/DMDTague/Pickle@${ENGINE_COMMIT}/web/public/engine`;
 const TABLEBASE_ENDPOINT = 'https://tablebase.lichess.ovh/standard';
 const TABLEBASE_ATTEMPTS = 3;
 const TABLEBASE_TIMEOUT_MS = 5500;
 const TABLEBASE_BACKOFF_MS = [350, 800];
+const FIXED_DEPTH = 11;
+const FIXED_MOVETIME_MS = 3000;
 let engineBase = '/engine';
 
 function resetEngine({ preferCdn = false } = {}) {
@@ -197,11 +199,13 @@ async function runSearch(message) {
     };
   }
 
+  // Browser Pickle has one strength: full depth 11. Ignore any stale UI or
+  // caller-supplied difficulty values so every normal search is identical.
   const move = engine.ccall(
     'pickle_best_move',
     'string',
     ['string', 'number', 'number'],
-    [message.fen, message.depth, message.movetime],
+    [message.fen, FIXED_DEPTH, FIXED_MOVETIME_MS],
   );
 
   let sourceCode = 0;
