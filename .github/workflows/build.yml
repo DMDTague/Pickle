@@ -2,7 +2,7 @@ name: Build Pickle
 
 on:
   push:
-    branches: [main, feature/picklebook-elite]
+    branches: [main]
     paths:
       - '*.cpp'
       - '*.h'
@@ -50,30 +50,6 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-
-      - name: Finalize PickleBook policy sources
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          generator = Path('scripts/generate_opening_book.py')
-          text = generator.read_text(encoding='utf-8')
-          text = text.replace('import random\nimport urllib.request', 'import random\nimport sys\nimport urllib.request')
-          text = text.replace(
-              'factor *= 0.30 if undeveloped_before >= 2 else 0.62',
-              'factor *= 0.18 if undeveloped_before >= 2 else 0.62',
-          )
-          generator.write_text(text, encoding='utf-8')
-
-          app = Path('web/src/App.jsx')
-          text = app.read_text(encoding='utf-8')
-          text = text.replace('<strong>Stockfish opening book</strong>', '<strong>PickleBook</strong>')
-          text = text.replace(
-              '<span>8moves_v3 · official-stockfish/books</span>',
-              '<span>Lichess Elite · horizon-weighted for Pickle</span>',
-          )
-          app.write_text(text, encoding='utf-8')
-          PY
 
       - name: Generate PickleBook
         run: |
@@ -152,11 +128,11 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add scripts/generate_opening_book.py web/src/App.jsx opening_book_data.inc web/public/engine/pickle.js web/public/engine/pickle_web.wasm
+          git add opening_book_data.inc web/public/engine/pickle.js web/public/engine/pickle_web.wasm
           if git diff --cached --quiet; then
             echo 'Generated PickleBook and WebAssembly are already current.'
           else
-            git commit -m 'Finalize PickleBook policy and browser artifacts [skip ci]'
+            git commit -m 'Build PickleBook and WebAssembly [skip ci]'
             git pull --rebase
             git push
           fi
