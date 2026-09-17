@@ -4,7 +4,11 @@ A chess engine I built from scratch in C++, now playable in the browser.
 
 **Play Pickle:** https://pickle-dmdtagues-projects.vercel.app
 
-Pickle started as an excuse to learn what actually sits underneath a chess engine: bitboards, move generation, evaluation, search, hashing, time management, and all the small decisions that turn legal moves into good ones. It has gradually become a real engine project rather than a toy move picker.
+I got bored one day while working on Lean formalization and came back to this engine to take my mind off the existential horrors of theoretical mathematics with some good old-fashioned alpha-beta pruning.
+
+Pickle is a chess engine I built from scratch in C++. It uses bitboards, magic-bitboard attacks, handcrafted evaluation, alpha-beta/negamax search, principal variation search, transposition tables, move ordering, pruning and reduction techniques, its own opening book, and a UCI interface, with the same engine also compiled to WebAssembly for browser play.
+
+I specifically wanted to build my own engine rather than start with Stockfish or another open-source engine and progressively inherit its architecture. Pickle uses established computer-chess ideas, of course, but the point of the project has been to implement, test, break, repair, and tune those ideas myself and see how far I can push an engine whose search and evaluation are actually mine.
 
 ## Engine
 
@@ -39,11 +43,17 @@ The generated result is compiled into `opening_book_data.inc`, so native and bro
 
 ### How Pickle evaluates a position
 
-I want Pickle to play actively without confusing aggression with correctness. Its evaluation therefore rewards pressure that actually exists on the board rather than artificially discounting its own material.
+I originally hoped Pickle would play like his namesake: the titular satanic Border Collie from Adult Swim's *Mr. Pickles*, happily killing and mutilating its unfortunate human chess opponents through wildly aggressive play.
 
-The current evaluator blends middlegame and endgame terms and considers material, piece-square placement, mobility, bishop pair, pawn structure, passed and connected pawns, knight outposts, rook files and seventh-rank activity, king shelter, open files around the king, endgame king activity, pawn storms, and coordinated attacks on the enemy king zone.
+Unfortunately, every time I turned the aggression dial too far, Pickle's Elo began falling off a cliff.
 
-That gives the engine a bias toward active positions while still requiring compensation to be real.
+At one point I considered making the Colle System a central part of Pickle's repertoire, but decided against it until I was confident I could program the engine to be aggressive enough to make playing the Colle feel morally defensible.
+
+That changed the project somewhat. For now, the goal is to increase Pickle's playing strength as far as I reasonably can while keeping the engine recognizably its own. Its evaluation is entirely handcrafted and considers material, piece-square placement, mobility, bishop pair, pawn structure, passed and connected pawns, knight outposts, rook activity, king shelter, open files around the king, endgame king activity, pawn storms, and coordinated pressure on the enemy king.
+
+Once Pickle reaches a strength range I'm satisfied with, I want to investigate the more interesting questions: what does this engine value differently from Stockfish and stronger open-source engines such as Ethereal, Berserk, and Koivisto? Which of those differences are weaknesses, which are merely stylistic, and how much aggression can be deliberately reintroduced before playing strength starts collapsing again?
+
+Then, having done the responsible engineering work first, I can return to the original objective: turn Pickle into Mr. Pickles and reign terror upon those who dare face it.
 
 ## Play against Pickle
 
