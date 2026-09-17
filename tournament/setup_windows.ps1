@@ -78,14 +78,23 @@ Copy-Item $fastExe.FullName (Join-Path $BinDir 'fastchess.exe') -Force
 Write-Host 'Fetching latest official Stockfish release...'
 $sfRelease = Get-LatestRelease 'official-stockfish/Stockfish'
 $sfAssets = @($sfRelease.assets)
-$sfAsset = $sfAssets | Where-Object { $_.name -match '(?i)windows.*x64.*sse41.*\.zip$' } | Select-Object -First 1
+
+# Stockfish 19 names its 64-bit Intel/AMD package
+# stockfish-windows-x86-64-universal.zip. Older releases have also used x64 and
+# feature-specific package names, so accept either spelling while rejecting ARM64.
+$sfAsset = $sfAssets | Where-Object {
+    $_.name -match '(?i)^stockfish-windows-(x86[-_]?64|x64).*\.zip$' -and
+    $_.name -notmatch '(?i)arm64'
+} | Sort-Object {
+    if ($_.name -match '(?i)sse41') { 0 }
+    elseif ($_.name -match '(?i)universal') { 1 }
+    elseif ($_.name -match '(?i)avx2') { 2 }
+    else { 3 }
+} | Select-Object -First 1
+
 if (-not $sfAsset) {
-    $sfAsset = $sfAssets | Where-Object { $_.name -match '(?i)windows.*x64.*avx2.*\.zip$' } | Select-Object -First 1
+    throw "Could not find a compatible Windows x86-64 Stockfish ZIP in release $($sfRelease.tag_name). Assets: $((@($sfAssets.name) -join ', '))"
 }
-if (-not $sfAsset) {
-    $sfAsset = $sfAssets | Where-Object { $_.name -match '(?i)windows.*x64.*\.zip$' } | Select-Object -First 1
-}
-if (-not $sfAsset) { throw "Could not find a compatible Windows x64 Stockfish ZIP in release $($sfRelease.tag_name)." }
 $sfZip = Join-Path $DownloadDir $sfAsset.name
 Invoke-DownloadFile $sfAsset.browser_download_url $sfZip
 $sfExtract = Join-Path $DownloadDir 'stockfish'
