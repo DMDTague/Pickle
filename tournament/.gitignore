@@ -1,0 +1,7 @@
+bin/
+books/
+results/
+.downloads/
+environment.txt
+config.json
+*.zip
