@@ -56,7 +56,7 @@ The engine is compiled to WebAssembly and runs inside a Web Worker, so the brows
 The UI includes:
 
 - play as White or Black
-- multiple search-strength presets
+- fixed depth-11 engine play
 - live engine evaluation during normal search
 - search depth and node count
 - move history
@@ -138,6 +138,12 @@ npm run build
 
 The repository includes a root `vercel.json`. The production Vercel project is linked to this repository and deploys from `main`, so new pushes to `main` trigger the production deployment pipeline.
 
+## Local Elo tournament
+
+`tournament/` contains a Windows FastChess harness for estimating Pickle's fixed-D11 strength against official Stockfish `UCI_Elo` anchors. It builds/downloads the required binaries, uses the neutral `UHO_Lichess_4852_v1.epd` opening suite with paired colors, runs a quick rating bracket, then supports a longer 120+1 calibration run with a fitted Elo estimate and bootstrap confidence interval.
+
+See [`tournament/README.md`](tournament/README.md) for the complete workflow.
+
 ## Project layout
 
 ```text
@@ -156,6 +162,7 @@ Pickle/
 ├── zobrist.*               position hashing
 ├── wasm_api.cpp            browser-facing C++ API
 ├── scripts/                build/book-generation helpers
+├── tournament/             local FastChess Elo harness
 └── web/                    playable React interface
 ```
 
